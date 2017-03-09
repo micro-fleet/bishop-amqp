@@ -27,6 +27,7 @@
     "nyc": "^10.1.2"
   },
   "dependencies": {
+    "amqplib": "^0.5.1",
     "lodash": "^4.17.4"
   },
   "ava": {
