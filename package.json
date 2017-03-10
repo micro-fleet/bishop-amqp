@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "amqplib": "^0.5.1",
-    "lodash": "^4.17.4"
+    "lodash": "^4.17.4",
+    "shortid": "^2.2.8"
   },
   "ava": {
     "verbose": true,
