@@ -1,1 +1,4 @@
-module.exports = require('./src')
+module.exports = {
+  emitter: require('./src/emitter'),
+  transport: require('./src/transport')
+}
