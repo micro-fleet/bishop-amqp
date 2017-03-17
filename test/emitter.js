@@ -14,6 +14,11 @@ const Promise = require('bluebird')
 
 const { createEventEmitter, setMessageAsEmittable, createEventListener } = amqp.emitter
 
+// test.only('pattern testing...', async t => {
+//   const { routingKeyFromPattern } = require('../src/utils')
+//   console.log(routingKeyFromPattern({ qwe: 'asd', zxc: 'avb'}))
+// })
+
 test('emit messages over subscripion', async t => {
   t.plan(3)
 
@@ -24,11 +29,11 @@ test('emit messages over subscripion', async t => {
   bishop.register('after', await createEventEmitter())
 
   const listener = await createEventListener()
-  listener.on('role, act', (message, headers) => {
+  listener.on({ act: 'eventemitter' }, (message, headers) => {
     t.is(message, testMessage)
     t.deepEqual(headers, {
       pattern: { role: 'test', act: 'eventemitter', some: {}, parameters: {} },
-      routingKey: 'act.parameters.role.some'
+      routingKey: 'act.eventemitter.parameters.*.role.test.some.*'
     })
   })
 
