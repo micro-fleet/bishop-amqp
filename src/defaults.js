@@ -3,7 +3,7 @@ module.exports = {
   appId: null,                          // emitter
   role: null,                           // specify one role: client, server (default: both)
   pattern: null,                        // [client]: automaticly bind specified pattern to transport if set
-  queueName: null,                      // [server] common services queue to listen incoming messages (will generate own if not set)
+  queueName: null,                      // emitter: common services queue to listen incoming messages (will generate own if not set)
   routingKey: null,                     // [client/server]: routing key for incoming public messages
   connection: 'amqp://localhost',       // emitter
   defConsumerOpts: {                    // emitter

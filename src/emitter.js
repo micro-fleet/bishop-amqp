@@ -30,7 +30,7 @@ const createEventListener = async (userOptions, errorHandler) => {
   const config = defaultConfig(userOptions)
   const channel = await createAmqpChannel(config, errorHandler)
   const { exchange } = await channel.assertExchange(`${config.name}.events`, 'topic', config.defExchangeOpts)
-  const { queue } = await channel.assertQueue('', exchange, config.defQueueOpts)
+  const { queue } = await channel.assertQueue(config.queueName, exchange, config.defQueueOpts)
 
   return {
     // bind queue using specific pattern mask
