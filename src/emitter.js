@@ -20,7 +20,7 @@ const createEventEmitter = async (userOptions, errorHandler) => {
     const { routingKey } = headers
     if (routingKey) {
       const timestamp = Date.now()
-      await channel.publish(exchange, routingKey, new Buffer(JSON.stringify(message)), { headers, appId, timestamp })
+      await channel.publish(exchange, routingKey, new Buffer(JSON.stringify(message || null)), { headers, appId, timestamp })
     }
     return message
   }
