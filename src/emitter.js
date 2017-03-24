@@ -4,8 +4,8 @@ const { routingKeyFromPattern } = require('./utils')
 
 const defaultConfig = userConfig => {
   return ld.defaultsDeep({},
-    ld.pick(require('./defaults'), ['connection', 'appId', 'name', 'defExchangeOpts', 'defConsumerOpts']),
-    userConfig || {}
+    userConfig || {},
+    ld.pick(require('./defaults'), ['connection', 'appId', 'name', 'defExchangeOpts', 'defConsumerOpts'])
   )
 }
 

@@ -7,10 +7,11 @@ const defaultErrorHandler = err => { throw err }
 const createAmqpChannel = async (userOptions = {}, errorHandler) => {
   const config = ld.defaultsDeep(
     {},
-    ld.pick(require('./defaults'), ['connection']),
-    userOptions
+    userOptions,
+    ld.pick(require('./defaults'), ['connection'])
   )
   const connection = await amqplib.connect(config.connection)
+  console.log(`[amqp] connected to: ${config.connection}`)
   const channel = await connection.createChannel()
 
   channel.on('error', errorHandler || defaultErrorHandler)
