@@ -38,9 +38,7 @@ const createEventListener = async (userOptions, errorHandler) => {
       const routingKey = `#.${routingKeyFromPattern(pattern).split('.').join('.#.')}.#`
       // console.log('[bind]', queue, exchange, routingKey)
       await channel.bindQueue(queue, exchange, routingKey)
-      await channel.consume(queue, ({ content, properties }) => {
-        handler(JSON.parse(content), properties.headers)
-      }, config.defConsumerOpts)
+      await channel.consume(queue, message => handler(message, channel), config.defConsumerOpts)
     }
   }
 }
