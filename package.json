@@ -20,11 +20,11 @@
   },
   "homepage": "https://github.com/afoninsky/bishop-amqp#readme",
   "devDependencies": {
-    "ava": "^0.18.2",
-    "bishop": "^4.1.0",
-    "eslint": "^3.16.1",
+    "ava": "^0.19.1",
+    "bishop": "^5.0.2",
+    "eslint": "^3.19.0",
     "eslint-plugin-output-todo-comments": "0.0.7",
-    "nyc": "^10.1.2"
+    "nyc": "^10.3.2"
   },
   "dependencies": {
     "amqplib": "^0.5.1",
