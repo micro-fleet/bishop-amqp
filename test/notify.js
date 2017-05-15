@@ -9,24 +9,27 @@ docker run --hostname my-rabbit \
 
 const { test } = require('ava')
 const Bishop = require('bishop')
-const { createAmqpTransportAsync } = require(process.env.PWD)
+const transport = require(process.env.PWD)
 const Promise = require('bluebird')
 
 
 test('listen messages received over $notify', async t => {
 
+  const bishop = new Bishop({
+    ignoreSameMessage: false
+  })
+  await bishop.use(transport, {
+    name: 'test'
+  })
+
   t.plan(3)
   const testMessage = 'done'
-  const bishop = new Bishop()
-  const amqpTransport = await createAmqpTransportAsync()
-
-  bishop.register('transport', 'amqp', amqpTransport)
 
   bishop.add('role:test, act:eventemitter', () => {
     return testMessage
   })
 
-  bishop.follow('role:test', message => { // receive message from 'local' and 'amqp'
+  bishop.follow('role:test', message => { // receive same message from 'local' and 'amqp' due to 'ignoreSameMessage'
     t.is(message, testMessage)
   })
 

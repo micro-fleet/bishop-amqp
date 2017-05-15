@@ -19,7 +19,7 @@ async function createEventListenerAsync(config, channel, exchange, queue, routin
 }
 
 
-module.exports = async options => {
+module.exports = async (bishop, options) => {
 
   const config = defaultConfig(options)
 
@@ -28,7 +28,8 @@ module.exports = async options => {
   const { queue } = await channel.assertQueue(config.queueName, exchange, config.defQueueOpts)
 
   const eventEmitterAsync = await createEventEmitter(config, channel, exchange)
-  return {
+
+  const methods = {
 
     /**
      * Emit notification message into AMQP queue
@@ -49,4 +50,6 @@ module.exports = async options => {
         })
       }
   }
+
+  bishop.register('transport', config.name, methods)
 }
