@@ -15,11 +15,9 @@ const Promise = require('bluebird')
 
 test('listen messages received over $notify', async t => {
 
-  const bishop = new Bishop({
-    ignoreSameMessage: false
-  })
+  const bishop = new Bishop()
   await bishop.use(transport, {
-    name: 'test'
+    name: 'amqp-sample'
   })
 
   t.plan(3)
@@ -29,11 +27,13 @@ test('listen messages received over $notify', async t => {
     return testMessage
   })
 
-  bishop.follow('role:test', message => { // receive same message from 'local' and 'amqp' due to 'ignoreSameMessage'
+  bishop.follow('role:test', message => { // receive same message from 'local' and 'test'
     t.is(message, testMessage)
   })
 
-  const result = await bishop.act('role:test, act:eventemitter, $notify: true')
+  const result = await bishop.act('role:test, act:eventemitter', {
+    $notify: ['local', 'amqp-sample']
+  })
   t.is(result, testMessage)
   await Promise.delay(50) // wait till message arrive over amqp
 })

@@ -1,5 +1,6 @@
 module.exports = {
   name: 'amqp',                         // emitter
+  eventsQueueName: 'bishop.events',
   appId: null,                          // emitter
   role: null,                           // specify one role: client, server (default: both)
   pattern: null,                        // [client]: automaticly bind specified pattern to transport if set

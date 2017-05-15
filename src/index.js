@@ -24,7 +24,7 @@ module.exports = async (bishop, options) => {
   const config = defaultConfig(options)
 
   const channel = await createAmqpChannel(config, defaultErrorHandler)
-  const { exchange } = await channel.assertExchange(`${config.name}.events`, 'topic', config.defExchangeOpts)
+  const { exchange } = await channel.assertExchange(config.eventsQueueName, 'topic', config.defExchangeOpts)
   const { queue } = await channel.assertQueue(config.queueName, exchange, config.defQueueOpts)
 
   const eventEmitterAsync = await createEventEmitter(config, channel, exchange)

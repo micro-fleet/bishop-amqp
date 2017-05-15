@@ -6,7 +6,7 @@ module.exports = {
   defaultConfig(userConfig) {
     return ld.defaultsDeep({},
       userConfig || {},
-      ld.pick(require('./defaults'), ['connection', 'appId', 'name', 'defExchangeOpts', 'defConsumerOpts'])
+      ld.pick(require('./defaults'), ['connection', 'appId', 'name', 'defExchangeOpts', 'defConsumerOpts', 'eventsQueueName'])
     )
   },
 
