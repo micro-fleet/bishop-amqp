@@ -10,14 +10,13 @@ module.exports = {
     )
   },
 
-  // convert object { qwe: 'aaa', asd: 'bbb'} to string 'qwe.aaa.asd.bbb' with sorted keys
-  routingKeyFromPattern(input) {
+  patternPieces(input, wild = '*') {
     const pattern = objectify(input)
     return Object.keys(pattern).sort().map(key => {
       const keyType = typeof pattern[key]
-      const value = keyType === 'string' ? pattern[key] : '*'
+      const value = keyType === 'string' ? pattern[key] : wild
       return `${key}.${value}`
-    }).join('.')
+    })
   }
 
 }
