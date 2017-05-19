@@ -19,8 +19,8 @@ function createEventEmitter(config, channel, exchange) {
  * 2) bind to specified routing key
  * 3) fire handler on every message in queue
  */
-async function createEventListenerAsync(config, channel, exchange, routingKey, handler) {
-    const { queue } = await channel.assertQueue(null, exchange, config.defQueueOpts)
+async function createEventListenerAsync(config, channel, exchange, routingKey, queueName, handler) {
+    const { queue } = await channel.assertQueue(queueName, exchange, config.defQueueOpts)
     await channel.bindQueue(queue, exchange, routingKey)
     await channel.consume(queue, message => handler(message, channel), config.defConsumerOpts)
 }
@@ -48,9 +48,15 @@ module.exports = async (bishop, options) => {
     /**
      * Listen incoming patterns and match them against bishop
      */
-      async follow(message, listener) {
+      async follow(message, listener, headers) {
+        if (!config.appId) {
+          throw new Error('amqp - unable to follow: config.appId should be set')
+        }
+        // expect `message` always as object
+        const queueId = headers.queue
+        if (!queueId) { throw new Error('.amqp - unable to follow: you shoud specify $queue parameter in pattern')}
         const routingKey = `#.${patternPieces(message).join('.#.')}.#`
-        return createEventListenerAsync(config, channel, exchange, routingKey, (data) => {
+        return createEventListenerAsync(config, channel, exchange, routingKey, `follow.${config.appId}.${queueId}`, (data) => {
           listener(JSON.parse(data.content), data.properties.headers)
         })
       }

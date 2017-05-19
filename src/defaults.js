@@ -1,7 +1,7 @@
 module.exports = {
   name: 'amqp',                         //
   eventsQueueName: 'bishop.events',
-  appId: null,                          //
+  appId: null,                          // application unique id (generate unique queues)
   queueName: null,                      // common services queue to listen incoming messages (will generate own if not set)
   connection: 'amqp://localhost',
   defConsumerOpts: {
