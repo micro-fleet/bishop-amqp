@@ -46,7 +46,7 @@ test.serial('ensure events are routed to correct listeners', async t => {
   const bishop = new Bishop()
   await bishop.use(transport, {
     name: 'amqp-sample2',
-    appId: 'qwe'
+    appId: 'qwea'
   })
 
   bishop.add('role: statistic, event: stop-watch, cmd: create, $notify: amqp-sample2', () => {
@@ -66,11 +66,11 @@ test.serial('ensure events are routed to correct listeners', async t => {
   })
 
 
-  await bishop.follow('role: statistic, event: stop-watch, $queue: test2-1', message => {
+  await bishop.follow('role: statistic, event: stop-watch', message => {
     t.is(message, 'valid-emitter-1')
   })
 
-  await bishop.follow('role: users, cmd, $queue: test2-2', message => {
+  await bishop.follow('role: users, cmd', message => {
     t.is(message, 'valid-emitter-2')
   })
 
