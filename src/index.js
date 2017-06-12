@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const { createAmqpChannel, defaultErrorHandler } = require('./transport')
 const { defaultConfig, patternPieces } = require('./utils')
 
@@ -53,10 +54,11 @@ module.exports = async (bishop, options) => {
           throw new Error('amqp - unable to follow: config.appId should be set')
         }
         // expect `message` always as object
-        const queueId = headers.queue
-        if (!queueId) { throw new Error('.amqp - unable to follow: you shoud specify $queue parameter in pattern')}
         const routingKey = `#.${patternPieces(message).join('.#.')}.#`
-        return createEventListenerAsync(config, channel, exchange, routingKey, `follow.${config.appId}.${queueId}`, (data) => {
+        // create unique queue name for this follow event (different instances will get only one message)
+        const queueId = headers.queue || crypto.createHash('md5').update(routingKey).digest('hex')
+        const uniqueQueueName = `follow.${config.appId}.${queueId}`
+        return createEventListenerAsync(config, channel, exchange, routingKey, uniqueQueueName, (data) => {
           listener(JSON.parse(data.content), data.properties.headers)
         })
       }
