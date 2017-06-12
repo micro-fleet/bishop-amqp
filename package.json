@@ -1,6 +1,6 @@
 {
   "name": "bishop-amqp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "amqp v0.9.1 transport plugin for bishop.js library",
   "main": "index.js",
   "scripts": {
@@ -21,10 +21,10 @@
   "homepage": "https://github.com/afoninsky/bishop-amqp#readme",
   "devDependencies": {
     "ava": "^0.19.1",
-    "bishop": "^5.0.8",
-    "eslint": "^3.19.0",
+    "bishop": "^5.0.14",
+    "eslint": "^4.0.0",
     "eslint-plugin-output-todo-comments": "0.0.7",
-    "nyc": "^10.3.2"
+    "nyc": "^11.0.2"
   },
   "dependencies": {
     "amqplib": "^0.5.1",
