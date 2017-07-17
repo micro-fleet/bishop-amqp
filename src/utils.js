@@ -6,12 +6,16 @@ const { URL } = require('url')
 
 const defaultConfig = {
   name: '',
-  version: '',
+  env: 'bishop',
   driver: {
     defaultExchangeName: 'amq.topic',
     reconnect: true,
     reconnectBackoffStrategy: 'linear',
     reconnectBackoffTime: 1000
+  },
+  client: {
+    name: 'bishop',
+    version: '0.0.0'
   },
   connection: {
     host: 'localhost',
@@ -30,14 +34,13 @@ module.exports = {
 
   validateConfig(userConfig = {}) {
     const config = ld.defaultsDeep({}, userConfig, defaultConfig)
-    const { name, version = '0.0.0' } = config
-    if (!name) {
+    if (!config.name) {
       throw new Error('option "config.name" is required')
     }
     if (typeof config.connection === 'string') {
       config.connection = schemaFromUrl(config.connection)
     }
-    config.connection.clientProperties = { serviceName: name, serviceVersion: version }
+    config.connection.clientProperties = config.client
     return config
   },
 

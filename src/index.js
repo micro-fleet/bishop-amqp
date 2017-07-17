@@ -7,7 +7,7 @@ module.exports = async (bishop, options) => {
   const config = validateConfig(options)
 
   const connection = await createAmqpConnectionAsync(config)
-  const followExchange = await connection.exchange('bishop.follow', config.followExchange)
+  const followExchange = await connection.exchange(`${config.env}.follow`, config.followExchange)
   const createQueueAsync = (name, options) => {
     return new Promise(resolve => {
       const queue = connection.queue(name, options, () => resolve(queue))
