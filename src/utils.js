@@ -2,36 +2,11 @@ const ld = require('lodash')
 const { objectify } = require('bishop/src/utils')
 const amqp = require('amqp')
 const Promise = require('bluebird')
-
-
-const driverDefaults = {
-  defaultExchangeName: 'amq.topic',
-  reconnect: true,
-  reconnectBackoffStrategy: 'linear',
-  reconnectBackoffTime: 1000,
-}
-
-const connectionDefaults = {
-  // host: [
-  //   'rabbitmq-0.rabbitmq.default.svc.cluster.local',
-  //   'rabbitmq-1.rabbitmq.default.svc.cluster.local',
-  //   'rabbitmq-2.rabbitmq.default.svc.cluster.local',
-  // ],
-  host: 'localhost',
-  port: 5672,
-  // login: 'admin',
-  // password: 'HgKn96UufE',
-  heartbeat: 5, // in sec
-  // clientProperties: {
-  //   serviceName: 'app-name',
-  //   serviceVersion: '0.1.2'
-  // }
-}
-
-
-// const configRequiredFields = ['connection', 'name', 'appId']
+const { URL } = require('url')
 
 const defaultConfig = {
+  name: '',
+  version: '',
   driver: {
     defaultExchangeName: 'amq.topic',
     reconnect: true,
@@ -48,9 +23,7 @@ const defaultConfig = {
     type: 'topic',
     confirm: false
   },
-  followQueue: {
-
-  }
+  followQueue: {}
 }
 
 module.exports = {
@@ -60,6 +33,9 @@ module.exports = {
     const { name, version = '0.0.0' } = config
     if (!name) {
       throw new Error('option "config.name" is required')
+    }
+    if (typeof config.connection === 'string') {
+      config.connection = schemaFromUrl(config.connection)
     }
     config.connection.clientProperties = { serviceName: name, serviceVersion: version }
     return config
@@ -83,4 +59,27 @@ module.exports = {
     })
   }
 
+}
+
+
+function schemaFromUrl(url) {
+  const obj = new URL(url)
+  if (obj.protocol !== 'amqp:') {
+    throw new Error(`invalid amqp connecton string: ${url}`)
+  }
+
+  const schema = {
+    host: obj.host,
+    port: obj.port || 5672,
+    heartbeat: 5,
+    vhost: obj.pathname || '/',
+    clientProperties: {}
+  }
+  if (obj.username) { schema.login = obj.username }
+  if (obj.password) { schema.login = obj.password }
+
+  if (schema.host.includes(',')) {
+    schema.host = schema.host.split(',')
+  }
+  return schema
 }
