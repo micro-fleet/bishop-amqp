@@ -18,11 +18,10 @@ test.serial('listen messages received over $notify', async t => {
   const bishop = new Bishop()
   await bishop.use(transport, {
     name: 'amqp-sample',
-    appId: 'qweasd'
   })
 
   t.plan(3)
-  const testMessage = 'done'
+  const testMessage = Math.random()
 
   bishop.add('role:test, act:eventemitter', () => {
     return testMessage
@@ -45,8 +44,7 @@ test.serial('ensure events are routed to correct listeners', async t => {
 
   const bishop = new Bishop()
   await bishop.use(transport, {
-    name: 'amqp-sample2',
-    appId: 'qwea'
+    name: 'amqp-sample2'
   })
 
   bishop.add('role: statistic, event: stop-watch, cmd: create, $notify: amqp-sample2', () => {
@@ -84,7 +82,7 @@ test.serial('ensure events are routed to correct listeners', async t => {
 })
 
 
-test.serial('ensure messages routed between instances correctly', async t => {
+test.serial('ensure messages are routed between instances correctly', async t => {
 
   t.plan(3)
   const emitter = new Bishop()
