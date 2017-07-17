@@ -50,7 +50,7 @@ module.exports = {
     })
   },
 
-  createAmqpConnectionAsync(config, errorHandler = console.error) {
+  createAmqpConnectionAsync(config, errorHandler = printError) {
     const connection = amqp.createConnection(config.connection, config.driver)
     connection.on('error', errorHandler)
 
@@ -61,6 +61,9 @@ module.exports = {
 
 }
 
+function printError(err) {
+  console.error('[bishop amqp error]', err.message)
+}
 
 function schemaFromUrl(url) {
   const obj = new URL(url)
@@ -76,7 +79,7 @@ function schemaFromUrl(url) {
     clientProperties: {}
   }
   if (obj.username) { schema.login = obj.username }
-  if (obj.password) { schema.login = obj.password }
+  if (obj.password) { schema.password = obj.password }
 
   if (schema.host.includes(',')) {
     schema.host = schema.host.split(',')
