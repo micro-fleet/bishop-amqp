@@ -35,9 +35,9 @@ module.exports = async (bishop, options) => {
      */
       async follow(message, listener, headers) {
         const routingKey = `#.${splitPattern(message).join('.#.')}.#`
-        // create unique queue name for this follow event (message will be delivered to one instance of app only)
+        // create unique queue name for this follow event (message will be delivered to one instance of an app only)
         const queueId = headers.queue || crypto.createHash('md5').update(routingKey).digest('hex')
-        const uniqueQueueName = `follow.${config.name}.${queueId}`
+        const uniqueQueueName = `follow.${config.client.name}.${queueId}`
         const queue = await createQueueAsync(uniqueQueueName, config.followQueue)
         await queue.bind(followExchange, routingKey)
         queue.subscribe((message, headers) => {

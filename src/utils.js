@@ -5,8 +5,8 @@ const Promise = require('bluebird')
 const { URL } = require('url')
 
 const defaultConfig = {
-  name: '',
-  env: 'bishop',
+  name: '', // used to identify transport
+  env: 'bishop', // used in exchange name
   driver: {
     defaultExchangeName: 'amq.topic',
     reconnect: true,
@@ -14,7 +14,7 @@ const defaultConfig = {
     reconnectBackoffTime: 1000
   },
   client: {
-    name: 'bishop',
+    name: '', // used in folow queue name
     version: '0.0.0'
   },
   connection: {
@@ -36,6 +36,9 @@ module.exports = {
     const config = ld.defaultsDeep({}, userConfig, defaultConfig)
     if (!config.name) {
       throw new Error('option "config.name" is required')
+    }
+    if (!config.client.name) {
+      throw new Error('unique "config.client.name" is required')
     }
     if (typeof config.connection === 'string') {
       config.connection = schemaFromUrl(config.connection)
