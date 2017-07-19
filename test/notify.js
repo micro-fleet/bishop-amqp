@@ -18,6 +18,7 @@ test.serial('listen messages received over $notify', async t => {
   const bishop = new Bishop()
   await bishop.use(transport, {
     name: 'amqp-sample',
+    client: { name: 'test' }
   })
 
   t.plan(3)
@@ -44,7 +45,8 @@ test.serial('ensure events are routed to correct listeners', async t => {
 
   const bishop = new Bishop()
   await bishop.use(transport, {
-    name: 'amqp-sample2'
+    name: 'amqp-sample2',
+    client: { name: 'test2' }
   })
 
   bishop.add('role: statistic, event: stop-watch, cmd: create, $notify: amqp-sample2', () => {
@@ -89,9 +91,9 @@ test.serial('ensure messages are routed between instances correctly', async t =>
   const consumer1 = new Bishop()
   const consumer2 = new Bishop()
 
-  await emitter.use(transport, { name: 'amqp', appId: 'emitter' })
-  await consumer1.use(transport, { name: 'amqp', appId: 'consumer' })
-  await consumer2.use(transport, { name: 'amqp', appId: 'consumer' })
+  await emitter.use(transport, { name: 'amqp', client: { name: 'emitter' } })
+  await consumer1.use(transport, { name: 'amqp', client: { name: 'consumer' } })
+  await consumer2.use(transport, { name: 'amqp', client: { name: 'consumer' } })
 
   emitter.add('role: test, cmd: fake, additional: arguments, $notify: amqp', () => 'command executed' )
 
