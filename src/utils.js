@@ -31,7 +31,6 @@ const defaultConfig = {
 }
 
 module.exports = {
-
   validateConfig(userConfig = {}) {
     const config = ld.defaultsDeep({}, userConfig, defaultConfig)
     if (!config.name) {
@@ -49,11 +48,13 @@ module.exports = {
 
   splitPattern(input, wild = '*') {
     const pattern = objectify(input)
-    return Object.keys(pattern).sort().map(key => {
-      const keyType = typeof pattern[key]
-      const value = keyType === 'string' ? pattern[key] : wild
-      return `${key}.${value}`
-    })
+    return Object.keys(pattern)
+      .sort()
+      .map(key => {
+        const keyType = typeof pattern[key]
+        const value = keyType === 'string' ? pattern[key] : wild
+        return `${key}.${value}`
+      })
   },
 
   createAmqpConnectionAsync(config, errorHandler = printError) {
@@ -64,11 +65,11 @@ module.exports = {
       connection.on('ready', () => resolve(connection))
     })
   }
-
 }
 
 function printError(err) {
-  console.error('[bishop amqp error]', err.message)
+  console.error('bishop amqp error:')
+  console.error(err)
 }
 
 function schemaFromUrl(url) {
@@ -84,8 +85,12 @@ function schemaFromUrl(url) {
     vhost: obj.pathname || '/',
     clientProperties: {}
   }
-  if (obj.username) { schema.login = obj.username }
-  if (obj.password) { schema.password = obj.password }
+  if (obj.username) {
+    schema.login = obj.username
+  }
+  if (obj.password) {
+    schema.password = obj.password
+  }
 
   if (schema.host.includes(',')) {
     schema.host = schema.host.split(',')
