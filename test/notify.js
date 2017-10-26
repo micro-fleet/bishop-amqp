@@ -12,9 +12,7 @@ const Bishop = require('bishop')
 const transport = require(process.env.PWD)
 const Promise = require('bluebird')
 
-
 test.serial('listen messages received over $notify', async t => {
-
   const bishop = new Bishop()
   await bishop.use(transport, {
     name: 'amqp-sample',
@@ -28,7 +26,8 @@ test.serial('listen messages received over $notify', async t => {
     return testMessage
   })
 
-  await bishop.follow('role:test, $queue: test1-1', message => { // receive same message from 'local' and 'test'
+  await bishop.follow('role:test, $queue: test1-1', message => {
+    // receive same message from 'local' and 'test'
     t.is(message, testMessage)
   })
 
@@ -38,7 +37,6 @@ test.serial('listen messages received over $notify', async t => {
   t.is(result, testMessage)
   await Promise.delay(500) // wait till message arrive over amqp
 })
-
 
 test.serial('ensure events are routed to correct listeners', async t => {
   t.plan(5)
@@ -65,7 +63,6 @@ test.serial('ensure events are routed to correct listeners', async t => {
     return 'invalid-emitter-2'
   })
 
-
   await bishop.follow('role: statistic, event: stop-watch', message => {
     t.is(message, 'valid-emitter-1')
   })
@@ -74,7 +71,9 @@ test.serial('ensure events are routed to correct listeners', async t => {
     t.is(message, 'valid-emitter-2')
   })
 
-  await bishop.act('role: statistic, event: stop-watch, cmd: create')
+  await bishop.act('role: statistic, event: stop-watch, cmd: create', {
+    someshit: undefined // test against unsupported fields
+  })
   await bishop.act('role: statistic, event: stop-watch, cmd: create')
   await bishop.act('role: users, some:data, cmd: create')
   await bishop.act('role: users, cmd: create, other: option')
@@ -83,19 +82,26 @@ test.serial('ensure events are routed to correct listeners', async t => {
   await Promise.delay(500)
 })
 
-
 test.serial('ensure messages are routed between instances correctly', async t => {
-
   t.plan(3)
   const emitter = new Bishop()
   const consumer1 = new Bishop()
   const consumer2 = new Bishop()
 
   await emitter.use(transport, { name: 'amqp', client: { name: 'emitter' } })
-  await consumer1.use(transport, { name: 'amqp', client: { name: 'consumer' } })
-  await consumer2.use(transport, { name: 'amqp', client: { name: 'consumer' } })
+  await consumer1.use(transport, {
+    name: 'amqp',
+    client: { name: 'consumer' }
+  })
+  await consumer2.use(transport, {
+    name: 'amqp',
+    client: { name: 'consumer' }
+  })
 
-  emitter.add('role: test, cmd: fake, additional: arguments, $notify: amqp', () => 'command executed' )
+  emitter.add(
+    'role: test, cmd: fake, additional: arguments, $notify: amqp',
+    () => 'command executed'
+  )
 
   const messages = []
   await consumer1.follow('role: test, cmd: fake, $queue: test3-1', () => {

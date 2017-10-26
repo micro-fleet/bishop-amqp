@@ -30,7 +30,20 @@ const defaultConfig = {
   followQueue: {}
 }
 
+function amqpCompatibleValue(value, defaultValue) {
+  switch (typeof value) {
+    case 'string':
+      return value
+    case 'undefined':
+      return defaultValue
+    default:
+      return defaultValue
+  }
+}
+
 module.exports = {
+  amqpCompatibleValue,
+
   validateConfig(userConfig = {}) {
     const config = ld.defaultsDeep({}, userConfig, defaultConfig)
     if (!config.name) {
@@ -51,8 +64,7 @@ module.exports = {
     return Object.keys(pattern)
       .sort()
       .map(key => {
-        const keyType = typeof pattern[key]
-        const value = keyType === 'string' ? pattern[key] : wild
+        const value = amqpCompatibleValue(pattern[key], wild)
         return `${key}.${value}`
       })
   },
