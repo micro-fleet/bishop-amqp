@@ -6,7 +6,6 @@ const {
   amqpCompatibleValue
 } = require('./utils')
 const Promise = require('bluebird')
-const ld = require('lodash')
 
 module.exports = async (bishop, options) => {
   const config = validateConfig(options)
@@ -39,8 +38,8 @@ module.exports = async (bishop, options) => {
     notify(message, headers) {
       const routingKey = splitPattern(headers.pattern).join('.')
       // remove 'undefined' from headers to avoid `unsupported type in amqp table: undefined` error due to serialization problem
-      headers.pattern = ld.mapValues(headers.pattern || {}, value => amqpCompatibleValue(value, ''))
-      headers.source = ld.mapValues(headers.source || {}, value => amqpCompatibleValue(value, ''))
+      headers.pattern = amqpCompatibleValue(headers.pattern, '')
+      headers.source = amqpCompatibleValue(headers.source, '')
       return publishFollowEventAsync(routingKey, message, headers)
     },
 

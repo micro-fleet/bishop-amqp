@@ -32,13 +32,22 @@ const defaultConfig = {
 
 function amqpCompatibleValue(value, defaultValue) {
   switch (typeof value) {
+    case 'object':
+      if (Array.isArray(value)) {
+        return value
+      }
+      return ld.isPlainObject(value)
+        ? ld.mapValues(value, item => amqpCompatibleValue(item, defaultValue))
+        : defaultValue
     case 'string':
+    case 'number':
       return value
-    case 'undefined':
-      return defaultValue
-    default:
-      return defaultValue
+    // case 'undefined':
+    //   return defaultValue
+    // default:
+    //   return defaultValue
   }
+  return defaultValue
 }
 
 module.exports = {
