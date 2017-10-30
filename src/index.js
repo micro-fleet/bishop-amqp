@@ -24,7 +24,8 @@ module.exports = async (bishop, options) => {
 
   const publishFollowEventAsync = async (routingKey, message, headers) => {
     const timestamp = Date.now()
-    await followExchange.publish(routingKey, new Buffer(JSON.stringify(message || null)), {
+    const payload = [message || null, headers]
+    await followExchange.publish(routingKey, new Buffer(JSON.stringify(payload)), {
       headers,
       appId: `${clientName}@${clientVersion}`,
       timestamp
@@ -59,8 +60,19 @@ module.exports = async (bishop, options) => {
       const queue = await createQueueAsync(uniqueQueueName, config.followQueue)
       await queue.bind(followExchange, routingKey)
       console.log(`Listen: queue="${uniqueQueueName}", route="${routingKey}"`)
-      queue.subscribe((message, headers) => {
-        listener(JSON.parse(message.data), headers)
+      queue.subscribe((data /*, headers*/) => {
+        let bishopMessage, bishopHeaders
+        try {
+          const arr = JSON.parse(data.data)
+          if (!Array.isArray(arr) || arr.length !== 2) {
+            throw new Error('wrong format')
+          }
+          bishopMessage = arr[0]
+          bishopHeaders = arr[1]
+        } catch (err) {
+          return console.error('invalid incoming AMQP message, [message, headers] expected')
+        }
+        listener(bishopMessage, bishopHeaders)
       })
     }
   }
