@@ -1,10 +1,5 @@
 const crypto = require('crypto')
-const {
-  validateConfig,
-  splitPattern,
-  createAmqpConnectionAsync,
-  amqpCompatibleValue
-} = require('./utils')
+const { validateConfig, splitPattern, createAmqpConnectionAsync } = require('./utils')
 const Promise = require('bluebird')
 
 module.exports = async (bishop, options) => {
@@ -26,7 +21,6 @@ module.exports = async (bishop, options) => {
     const timestamp = Date.now()
     const payload = [message || null, headers]
     await followExchange.publish(routingKey, new Buffer(JSON.stringify(payload)), {
-      headers,
       appId: `${clientName}@${clientVersion}`,
       timestamp
     })
@@ -38,9 +32,6 @@ module.exports = async (bishop, options) => {
      */
     notify(message, headers) {
       const routingKey = splitPattern(headers.pattern).join('.')
-      // remove 'undefined' from headers to avoid `unsupported type in amqp table: undefined` error due to serialization problem
-      headers.pattern = amqpCompatibleValue(headers.pattern, '')
-      headers.source = amqpCompatibleValue(headers.source, '')
       return publishFollowEventAsync(routingKey, message, headers)
     },
 
