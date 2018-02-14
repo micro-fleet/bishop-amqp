@@ -1,9 +1,16 @@
 const crypto = require('crypto')
-const { validateConfig, splitPattern, createAmqpConnectionAsync } = require('./utils')
+const { createTraceSpan, finishSpan } = require('@fulldive/common/src/tracer')
 const Promise = require('bluebird')
+
+const { validateConfig, splitPattern, createAmqpConnectionAsync } = require('./utils')
 
 module.exports = async (bishop, options) => {
   const config = validateConfig(options)
+
+  const { tracer, log } = bishop
+  if (!tracer) {
+    throw new Error('please init tracer')
+  }
 
   const { name: clientName, version: clientVersion } = config.client
   const connection = await createAmqpConnectionAsync(config)
@@ -50,7 +57,7 @@ module.exports = async (bishop, options) => {
       const uniqueQueueName = `follow.${config.env}.${clientName}.${queueId}`
       const queue = await createQueueAsync(uniqueQueueName, config.followQueue)
       await queue.bind(followExchange, routingKey)
-      console.log(`Listen: queue="${uniqueQueueName}", route="${routingKey}"`)
+      log.info(`Listen: queue="${uniqueQueueName}", route="${routingKey}"`)
       queue.subscribe((data /*, headers*/) => {
         let bishopMessage, bishopHeaders
         try {
@@ -61,9 +68,18 @@ module.exports = async (bishop, options) => {
           bishopMessage = arr[0]
           bishopHeaders = arr[1]
         } catch (err) {
-          return console.error('invalid incoming AMQP message, [message, headers] expected')
+          return log.error('invalid incoming AMQP message, [message, headers] expected')
         }
+        const span = createTraceSpan(tracer, 'follow', bishopHeaders.trace)
         listener(bishopMessage, bishopHeaders)
+          .then(result => {
+            finishSpan(span)
+            return result
+          })
+          .catch(err => {
+            finishSpan(span, err)
+            throw err
+          })
       })
     }
   }
