@@ -1,88 +1,73 @@
-const crypto = require('crypto')
 const { createTraceSpan, finishSpan } = require('@fulldive/common/src/tracer')
-const Promise = require('bluebird')
+const { validateOrThrow } = require('@fulldive/common/src/joi')
+const AMQPTransport = require('@microfleet/transport-amqp')
 
-const { validateConfig, splitPattern, createAmqpConnectionAsync } = require('./utils')
+const { splitPattern, uniqueFollowQueueName } = require('./utils')
 
-module.exports = async (bishop, options) => {
-  const config = validateConfig(options)
+const schemas = require('./options')
 
-  const { tracer, log } = bishop
-  if (!tracer) {
-    throw new Error('please init tracer')
+module.exports = async (bishop, _options) => {
+  const options = validateOrThrow(_options, schemas.init)
+  const { tracer, log = console } = bishop
+  const { name, version, timeout } = options
+
+  const AMQPOptions = {
+    ...options.amqp,
+    name,
+    version,
+    timeout,
+    tracer
   }
 
-  const { name: clientName, version: clientVersion } = config.client
-  const connection = await createAmqpConnectionAsync(config)
-  const followExchangeName = `${config.env}.follow`
-  const followExchange = await connection.exchange(followExchangeName, config.followExchange)
-  const createQueueAsync = (name, options) => {
-    return new Promise(resolve => {
-      const queue = connection.queue(name, options, () => {
-        return resolve(queue)
-      })
-    })
-  }
-
-  const publishFollowEventAsync = async (routingKey, message, headers) => {
-    const timestamp = Date.now()
-    const payload = [message || null, headers]
-    await followExchange.publish(routingKey, new Buffer(JSON.stringify(payload)), {
-      appId: `${clientName}@${clientVersion}`,
-      timestamp
-    })
-  }
+  const amqp = await AMQPTransport.connect(AMQPOptions)
 
   const methods = {
     /**
      * Emit notification message into AMQP queue
      */
-    notify(message, headers) {
-      const routingKey = splitPattern(headers.pattern).join('.')
-      return publishFollowEventAsync(routingKey, message, headers)
+    notify(message, bishopHeaders) {
+      const routingKey = splitPattern(bishopHeaders.pattern).join('.')
+      const options = {
+        headers: {
+          bishopHeaders: JSON.stringify(bishopHeaders)
+        }
+      }
+      return amqp.publish(routingKey, message, options)
     },
 
     /**
-     * Listen incoming patterns and match them against bishop
+     * Listen incoming patterns and match them against bishop.
+     * Every message should be delivered to one app instance only by default
      */
-    async follow(message, listener, headers) {
+    async follow(message, listener, _config) {
+      const config = validateOrThrow(_config, schemas.follow)
+
       const routingKey = `#.${splitPattern(message).join('.#.')}.#`
-      // create unique queue name for this follow event (message will be delivered to one instance of an app only)
-      const queueId =
-        headers.queue ||
-        crypto
-          .createHash('md5')
-          .update(routingKey)
-          .digest('hex')
-      const uniqueQueueName = `follow.${config.env}.${clientName}.${queueId}`
-      const queue = await createQueueAsync(uniqueQueueName, config.followQueue)
-      await queue.bind(followExchange, routingKey)
-      log.info(`Listen: queue="${uniqueQueueName}", route="${routingKey}"`)
-      queue.subscribe((data /*, headers*/) => {
-        let bishopMessage, bishopHeaders
-        try {
-          const arr = JSON.parse(data.data)
-          if (!Array.isArray(arr) || arr.length !== 2) {
-            throw new Error('wrong format')
-          }
-          bishopMessage = arr[0]
-          bishopHeaders = arr[1]
-        } catch (err) {
-          return log.error('invalid incoming AMQP message, [message, headers] expected')
-        }
+      const queueName =
+        config.queue || uniqueFollowQueueName(routingKey, 'follow', options.name, options.env)
+
+      // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
+      function router(message, properties /*, raw*/) {
+        const { headers } = properties
+        const { bishopHeaders } = headers
+
         const span = createTraceSpan(tracer, 'follow', bishopHeaders.trace)
-        listener(bishopMessage, bishopHeaders)
-          .then(result => {
-            finishSpan(span)
-            return result
-          })
+        listener(message, JSON.parse(bishopHeaders))
           .catch(err => {
             finishSpan(span, err)
             throw err
           })
-      })
+          .then(result => {
+            finishSpan(span)
+            return result
+          })
+      }
+
+      const { queue } = await amqp.createQueue({ queue: queueName, router })
+      await amqp.bindRoute(options.amqp.exchange, queue, routingKey)
+      log.info(`listen queue="${queueName}", route="${routingKey}"`)
     }
   }
 
-  bishop.register('transport', config.name, methods)
+  bishop.register('transport', options.name, methods)
 }

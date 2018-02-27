@@ -8,15 +8,14 @@ docker run --hostname my-rabbit \
 */
 
 const { test } = require('ava')
-const Bishop = require('bishop')
+const Bishop = require('@fulldive/bishop')
 const transport = require(process.env.PWD)
 const Promise = require('bluebird')
 
 test.serial('listen messages received over $notify', async t => {
   const bishop = new Bishop()
   await bishop.use(transport, {
-    name: 'amqp-sample',
-    client: { name: 'test' }
+    name: 'amqp-sample'
   })
 
   t.plan(3)
@@ -79,7 +78,7 @@ test.serial('ensure events are routed to correct listeners', async t => {
   await bishop.act('role: users, cmd: create, other: option')
   await bishop.act('oops, role: users, cmd: create')
 
-  await Promise.delay(500)
+  await Promise.delay(300)
 })
 
 test.serial('ensure messages are routed between instances correctly', async t => {

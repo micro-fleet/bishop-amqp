@@ -1,5 +1,5 @@
 {
-  "name": "bishop-amqp",
+  "name": "@fulldive/bishop-amqp",
   "version": "1.4.0",
   "description": "amqp v0.9.1 transport plugin for bishop.js library",
   "main": "index.js",
@@ -22,17 +22,17 @@
   "homepage": "https://github.com/afoninsky/bishop-amqp#readme",
   "devDependencies": {
     "ava": "^0.25.0",
-    "bishop": "^5.0.14",
-    "eslint": "^4.9.0",
+    "@fulldive/bishop": "^1.0.0",
+    "eslint": "^4.18.1",
     "eslint-config-prettier": "^2.6.0",
     "eslint-plugin-prettier": "^2.3.1",
     "nyc": "^11.0.2",
-    "prettier": "^1.7.4"
+    "prettier": "^1.11.0"
   },
   "dependencies": {
-    "@fulldive/common": "^2.3.0",
-    "amqp": "^0.2.6",
-    "lodash": "^4.17.4",
+    "@fulldive/common": "^2.4.0",
+    "@microfleet/transport-amqp": "^13.0.1",
+    "joi": "^13.1.2",
     "shortid": "^2.2.8"
   },
   "ava": {
