@@ -1,9 +1,7 @@
 const crypto = require('crypto')
+const { URL } = require('url')
 
-// const Promise = require('bluebird')
-// const { URL } = require('url')
-
-module.exports = { splitPattern, uniqueFollowQueueName }
+module.exports = { splitPattern, uniqueFollowQueueName, objectifyConnectionUrl }
 
 function text2obj(input) {
   return input.split(',').reduce((prev, cur) => {
@@ -11,6 +9,33 @@ function text2obj(input) {
     prev[key.trim()] = value.trim()
     return prev
   }, {})
+}
+
+function objectifyConnectionUrl(url) {
+  if (typeof url !== 'string') {
+    return url
+  }
+  const obj = new URL(url)
+  if (obj.protocol !== 'amqp:') {
+    throw new Error(`invalid amqp connecton string: ${url}`)
+  }
+
+  const schema = {
+    host: obj.host,
+    port: obj.port || 5672,
+    vhost: obj.pathname || '/'
+  }
+  if (obj.username) {
+    schema.login = obj.username
+  }
+  if (obj.password) {
+    schema.password = obj.password
+  }
+
+  if (schema.host.includes(',')) {
+    schema.host = schema.host.split(',')
+  }
+  return schema
 }
 
 function splitPattern(input, wild = '*') {
@@ -31,29 +56,3 @@ function uniqueFollowQueueName(routingKey, ...clientParts) {
     .digest('hex')
   return [...clientParts, queueId].join('.')
 }
-
-// function schemaFromUrl(url) {
-//   const obj = new URL(url)
-//   if (obj.protocol !== 'amqp:') {
-//     throw new Error(`invalid amqp connecton string: ${url}`)
-//   }
-
-//   const schema = {
-//     host: obj.host,
-//     port: obj.port || 5672,
-//     heartbeat: 5,
-//     vhost: obj.pathname || '/',
-//     clientProperties: {}
-//   }
-//   if (obj.username) {
-//     schema.login = obj.username
-//   }
-//   if (obj.password) {
-//     schema.password = obj.password
-//   }
-
-//   if (schema.host.includes(',')) {
-//     schema.host = schema.host.split(',')
-//   }
-//   return schema
-// }

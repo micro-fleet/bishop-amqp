@@ -2,11 +2,14 @@ const { createTraceSpan, finishSpan } = require('@fulldive/common/src/tracer')
 const { validateOrThrow } = require('@fulldive/common/src/joi')
 const AMQPTransport = require('@microfleet/transport-amqp')
 
-const { splitPattern, uniqueFollowQueueName } = require('./utils')
+const { splitPattern, uniqueFollowQueueName, objectifyConnectionUrl } = require('./utils')
 
 const schemas = require('./options')
 
-module.exports = async (bishop, _options) => {
+module.exports = async (bishop, __options = {}) => {
+  // clone options to avoid replacing
+  const _options = JSON.parse(JSON.stringify(__options))
+  _options.amqp.connection = objectifyConnectionUrl(_options.amqp.connection)
   const options = validateOrThrow(_options, schemas.init)
   const { tracer, log = console } = bishop
   const { name, version, timeout } = options
@@ -15,11 +18,19 @@ module.exports = async (bishop, _options) => {
     ...options.amqp,
     name,
     version,
-    timeout,
-    tracer
+    timeout
   }
-
   const amqp = await AMQPTransport.connect(AMQPOptions)
+
+  // declare exchange for .follow
+  // durable=false, autoDelete=true for backward compatibility purposes
+  const followExchange = await amqp._amqp.exchangeAsync({
+    autoDelete: true,
+    durable: false,
+    type: 'topic',
+    exchange: options.followExchange
+  })
+  await followExchange.declareAsync()
 
   const methods = {
     /**
@@ -43,15 +54,24 @@ module.exports = async (bishop, _options) => {
       const config = validateOrThrow(_config, schemas.follow)
 
       const routingKey = `#.${splitPattern(message).join('.#.')}.#`
+      // WARN: queue name should be the same between instances to avoid messagind dublication
       const queueName =
         config.queue || uniqueFollowQueueName(routingKey, 'follow', options.name, options.env)
 
       // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
-      function router(message, properties /*, raw*/) {
-        const { headers } = properties
-        const { bishopHeaders: bishopHeadersString } = headers
-
-        const bishopHeaders = JSON.parse(bishopHeadersString)
+      function router(_message, properties /*, raw*/) {
+        console.log('>>>>')
+        const bishopHeadersString = properties.headers && properties.headers.bishopHeaders
+        let bishopHeaders, message
+        // backward compatibility with previous bishop version
+        if (!bishopHeadersString) {
+          const [realMessage, _bishopHeaders] = _message
+          message = realMessage
+          bishopHeaders = _bishopHeaders
+        } else {
+          bishopHeaders = JSON.parse(bishopHeadersString)
+          message = _message
+        }
 
         const span = createTraceSpan(tracer, 'follow:handler', bishopHeaders.trace)
         span.setTag('bishop.follow.pattern', bishopHeaders.pattern)
@@ -68,10 +88,12 @@ module.exports = async (bishop, _options) => {
       }
 
       const { queue } = await amqp.createQueue({ queue: queueName, router })
-      await amqp.bindRoute(options.amqp.exchange, queue, routingKey)
-      log.info(`listen queue="${queueName}", route="${routingKey}"`)
+      await amqp.bindRoute(options.followExchange, queue, routingKey)
+      log.info(
+        `listen queue="${queueName}", route="${routingKey}", exchange="${options.followExchange}"`
+      )
     }
   }
 
-  bishop.register('transport', options.name, methods)
+  bishop.register('transport', 'amqp', methods)
 }
