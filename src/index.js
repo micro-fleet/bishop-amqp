@@ -6,11 +6,9 @@ const { splitPattern, uniqueFollowQueueName, objectifyConnectionUrl } = require(
 
 const schemas = require('./options')
 
-module.exports = async (bishop, __options = {}) => {
-  // clone options to avoid replacing
-  const _options = JSON.parse(JSON.stringify(__options))
-  _options.amqp.connection = objectifyConnectionUrl(_options.amqp.connection)
+module.exports = async (bishop, _options = {}) => {
   const options = validateOrThrow(_options, schemas.init)
+  options.amqp.connection = objectifyConnectionUrl(options.amqp.connection)
   const { tracer, log = console } = bishop
   const { name, version, timeout } = options
 
@@ -34,16 +32,18 @@ module.exports = async (bishop, __options = {}) => {
 
   const methods = {
     /**
-     * Emit notification message into AMQP queue
+     * Emit notification message into AMQP follow queue
      */
     notify(message, bishopHeaders) {
       const routingKey = splitPattern(bishopHeaders.pattern).join('.')
-      const options = {
+      const config = {
+        exchange: options.followExchange,
         headers: {
           bishopHeaders: JSON.stringify(bishopHeaders)
         }
       }
-      return amqp.publish(routingKey, message, options)
+      console.log('>>>', routingKey)
+      return amqp.publish(routingKey, message, config)
     },
 
     /**
@@ -60,7 +60,6 @@ module.exports = async (bishop, __options = {}) => {
 
       // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
       function router(_message, properties /*, raw*/) {
-        console.log('>>>>')
         const bishopHeadersString = properties.headers && properties.headers.bishopHeaders
         let bishopHeaders, message
         // backward compatibility with previous bishop version
@@ -95,5 +94,5 @@ module.exports = async (bishop, __options = {}) => {
     }
   }
 
-  bishop.register('transport', 'amqp', methods)
+  bishop.register('transport', options.name, methods)
 }

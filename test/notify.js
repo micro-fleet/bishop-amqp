@@ -18,15 +18,16 @@ test.serial('listen messages received over $notify', async t => {
     name: 'amqp-sample'
   })
 
-  t.plan(3)
+  t.plan(4)
   const testMessage = Math.random()
 
   bishop.add('role:test, act:eventemitter', () => {
+    t.pass()
     return testMessage
   })
 
   await bishop.follow('role:test, $queue: test1-1', message => {
-    // receive same message from 'local' and 'test'
+    // receive same message twice (from 'local' and amqp)
     t.is(message, testMessage)
   })
 
@@ -42,8 +43,7 @@ test.serial('ensure events are routed to correct listeners', async t => {
 
   const bishop = new Bishop()
   await bishop.use(transport, {
-    name: 'amqp-sample2',
-    client: { name: 'test2' }
+    name: 'amqp-sample2'
   })
 
   bishop.add('role: statistic, event: stop-watch, cmd: create, $notify: amqp-sample2', () => {
@@ -87,14 +87,12 @@ test.serial('ensure messages are routed between instances correctly', async t =>
   const consumer1 = new Bishop()
   const consumer2 = new Bishop()
 
-  await emitter.use(transport, { name: 'amqp', client: { name: 'emitter' } })
+  await emitter.use(transport, { name: 'amqp' })
   await consumer1.use(transport, {
-    name: 'amqp',
-    client: { name: 'consumer' }
+    name: 'amqp'
   })
   await consumer2.use(transport, {
-    name: 'amqp',
-    client: { name: 'consumer' }
+    name: 'amqp'
   })
 
   emitter.add(
@@ -103,17 +101,22 @@ test.serial('ensure messages are routed between instances correctly', async t =>
   )
 
   const messages = []
+
+  // consumer1 OR consumer2 should receive message due to same queue
   await consumer1.follow('role: test, cmd: fake, $queue: test3-1', () => {
     messages.push(1)
   })
   await consumer2.follow('role: test, cmd: fake, $queue: test3-1', () => {
+    console.log(2)
     messages.push(2)
   })
 
+  // consumer1 should receive message due to other queue name
   await consumer1.follow('role: test, cmd: fake, $queue: test3-2', () => {
     t.pass()
   })
 
+  // consumer1 should receive message due to other queue name
   await consumer1.follow('role: test, cmd, $queue: test3-3', () => {
     t.pass()
   })
