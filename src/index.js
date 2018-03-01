@@ -42,7 +42,6 @@ module.exports = async (bishop, _options = {}) => {
           bishopHeaders: JSON.stringify(bishopHeaders)
         }
       }
-      console.log('>>>', routingKey)
       return amqp.publish(routingKey, message, config)
     },
 
