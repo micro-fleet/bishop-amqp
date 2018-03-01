@@ -49,10 +49,14 @@ module.exports = async (bishop, _options) => {
       // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
       function router(message, properties /*, raw*/) {
         const { headers } = properties
-        const { bishopHeaders } = headers
+        const { bishopHeaders: bishopHeadersString } = headers
 
-        const span = createTraceSpan(tracer, 'follow', bishopHeaders.trace)
-        listener(message, JSON.parse(bishopHeaders))
+        const bishopHeaders = JSON.parse(bishopHeadersString)
+
+        const span = createTraceSpan(tracer, 'follow:handler', bishopHeaders.trace)
+        span.setTag('bishop.follow.pattern', bishopHeaders.pattern)
+        span.setTag('bishop.follow.source', bishopHeaders.source)
+        listener(message, bishopHeaders)
           .catch(err => {
             finishSpan(span, err)
             throw err
