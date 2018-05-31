@@ -42,7 +42,8 @@ module.exports = async (bishop, _options = {}) => {
           bishopHeaders: JSON.stringify(bishopHeaders)
         }
       }
-      return amqp.publish(routingKey, message, config)
+      const result = typeof message === 'undefined' ? null : message
+      return amqp.publish(routingKey, result, config)
     },
 
     /**

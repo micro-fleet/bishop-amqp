@@ -81,6 +81,28 @@ test.serial('ensure events are routed to correct listeners', async t => {
   await Promise.delay(300)
 })
 
+test.serial('check valid serialization of undefined', async t => {
+  t.plan(1)
+
+  const producer = new Bishop()
+  await producer.use(transport, {
+    name: 'amqp'
+  })
+  const consumer = new Bishop()
+  await consumer.use(transport, {
+    name: 'amqp'
+  })
+  producer.add('role:test-serialize, $notify:amqp', async () => {})
+
+  await consumer.follow('role:test-serialize', (message, headers) => {
+    t.is(message, null)
+  })
+
+  await producer.act('role:test-serialize')
+
+  await Promise.delay(300)
+})
+
 test.serial('ensure messages are routed between instances correctly', async t => {
   t.plan(3)
   const emitter = new Bishop()
