@@ -63,7 +63,3 @@ test('only one service gets RPC call', async t => {
   t.is(callQueue.length, 1)
   t.is(callQueue[0], result)
 })
-
-test.skip('respects timeout', async t => {
-  // 2do
-})

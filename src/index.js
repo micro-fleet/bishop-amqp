@@ -7,12 +7,17 @@ const { splitPattern, uniqueQueueName, objectifyConnectionUrl } = require('./uti
 const schemas = require('./options')
 
 const RPC_QUEUE_PREFIX = 'rpc'
+const DEFAULT_TIMEOUT = 5000
+const TIMEOUT_OFFSET = 100
 
 module.exports = async (bishop, _options = {}) => {
   const options = validateOrThrow(_options, schemas.init)
   options.amqp.connection = objectifyConnectionUrl(options.amqp.connection)
   const { tracer, log = console } = bishop
   const { name, version, timeout } = options
+
+  // took bishop default timeout if transport's one is not set
+  const defaultTimeout = timeout || bishop.config.timeout || DEFAULT_TIMEOUT
 
   const AMQPOptions = {
     ...options.amqp,
@@ -21,15 +26,16 @@ module.exports = async (bishop, _options = {}) => {
     tracer,
     name,
     version,
-    timeout
+    timeout: defaultTimeout
   }
 
   /**
    * Listen incoming messages, search result in local bishop instance and return response
    */
   const rpcListener = (message, properties, actions, callback) => {
+    const headersTimeout = properties.headers.timeout && properties.headers.timeout - TIMEOUT_OFFSET
     bishop
-      .act({ ...message, $local: true })
+      .act({ ...message, $local: true, $timeout: headersTimeout || defaultTimeout })
       .then(response => callback(null, response))
       .catch(err => callback(err))
   }
@@ -116,7 +122,7 @@ module.exports = async (bishop, _options = {}) => {
      * Send request to specefied queue/receiver and wait for the answer
      */
     async request(message, headers) {
-      const { receiver } = headers
+      const { receiver, timeout } = headers
       if (!receiver) {
         throw new Error('Unable to send pattern - $receiver is not set')
       }
@@ -128,6 +134,11 @@ module.exports = async (bishop, _options = {}) => {
           bishopHeaders: JSON.stringify(headers)
         }
       }
+      if (timeout) {
+        // proxy timeout if set in request
+        config.headers.timeout = timeout + TIMEOUT_OFFSET
+      }
+
       const result = typeof message === 'undefined' ? null : message
       return amqp.sendAndWait(queueName, result, config).catch(err => {
         // handle "no amqp route" error and convert it into bishop error

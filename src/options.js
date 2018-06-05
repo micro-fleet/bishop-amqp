@@ -8,7 +8,7 @@ const init = Joi.object({
     .default('default')
     .description('Env value to split different env queues in one AMQP instance'),
   version: Joi.string().default('n/a'),
-  timeout: Joi.number().default(10000),
+  timeout: Joi.number(),
   followExchange: Joi.string().default('bishop.follow'),
   amqp: Joi.object({
     // https://github.com/microfleet/transport-amqp/blob/HEAD/src/schema.js
