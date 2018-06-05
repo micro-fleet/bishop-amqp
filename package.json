@@ -1,6 +1,6 @@
 {
   "name": "@fulldive/bishop-amqp",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "amqp v0.9.1 transport plugin for bishop.js library",
   "main": "index.js",
   "scripts": {
@@ -29,12 +29,12 @@
     "eslint": "^4.18.1",
     "eslint-config-prettier": "^2.6.0",
     "eslint-plugin-prettier": "^2.3.1",
-    "nyc": "^11.0.2",
-    "prettier": "^1.11.1"
+    "nyc": "^12.0.2",
+    "prettier": "^1.13.4"
   },
   "dependencies": {
-    "@fulldive/common": "^2.4.0",
-    "@microfleet/transport-amqp": "^13.0.1",
+    "@fulldive/common": "^3.0.13",
+    "@microfleet/transport-amqp": "^13.1.0",
     "joi": "^13.1.2",
     "shortid": "^2.2.8"
   },

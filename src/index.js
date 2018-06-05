@@ -2,7 +2,7 @@ const { createTraceSpan, finishSpan } = require('@fulldive/common/src/tracer')
 const { validateOrThrow } = require('@fulldive/common/src/joi')
 const AMQPTransport = require('@microfleet/transport-amqp')
 
-const { splitPattern, uniqueFollowQueueName, objectifyConnectionUrl } = require('./utils')
+const { splitPattern, uniqueQueueName, objectifyConnectionUrl } = require('./utils')
 
 const schemas = require('./options')
 
@@ -14,13 +14,29 @@ module.exports = async (bishop, _options = {}) => {
 
   const AMQPOptions = {
     ...options.amqp,
+    // listen for incoming rpc requests
+    listen: uniqueQueueName(null, 'rpc', name, options.env),
     name,
     version,
     timeout
   }
-  const amqp = await AMQPTransport.connect(AMQPOptions)
 
-  // declare exchange for .follow
+  /**
+   * Listen incoming messages and search result in local bishop instance
+   */
+  const rpcListener = (message, properties, actions, callback) => {
+    bishop
+      .act(message)
+      .then(response => callback(null, response))
+      .catch(err => callback(err))
+  }
+
+  const amqp = await AMQPTransport.connect(
+    AMQPOptions,
+    rpcListener
+  )
+
+  // declare exchange for bishop.follow
   // durable=false, autoDelete=true for backward compatibility purposes
   const followExchange = await amqp._amqp.exchangeAsync({
     autoDelete: true,
@@ -56,7 +72,7 @@ module.exports = async (bishop, _options = {}) => {
       const routingKey = `#.${splitPattern(message).join('.#.')}.#`
       // WARN: queue name should be the same between instances to avoid messagind dublication
       const queueName =
-        config.queue || uniqueFollowQueueName(routingKey, 'follow', options.name, options.env)
+        config.queue || uniqueQueueName(routingKey, 'follow', options.name, options.env)
 
       // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
       function router(_message, properties /*, raw*/) {
@@ -88,9 +104,31 @@ module.exports = async (bishop, _options = {}) => {
 
       const { queue } = await amqp.createQueue({ queue: queueName, router })
       await amqp.bindRoute(options.followExchange, queue, routingKey)
-      log.info(
+      log.debug(
         `listen queue="${queueName}", route="${routingKey}", exchange="${options.followExchange}"`
       )
+    },
+
+    /**
+     * Send request to specefied queue/receiver and wait for the answer
+     */
+    async request(message, headers) {
+      const { receiver } = headers
+      if (!receiver) {
+        throw new Error('Unable to send pattern - $receiver is not set')
+      }
+      const queueName = uniqueQueueName(null, 'rpc', receiver, options.env)
+      const config = {
+        confirm: true, // wait for commit confirmation
+        mandatory: true, // exception if message can be routed to queue
+        headers: {
+          bishopHeaders: JSON.stringify(headers)
+        }
+      }
+      const result = typeof message === 'undefined' ? null : message
+      const response = await amqp.publishAndWait(queueName, result, config)
+      console.log('???', response)
+      process.exit()
     }
   }
 

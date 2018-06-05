@@ -1,7 +1,7 @@
 const crypto = require('crypto')
 const { URL } = require('url')
 
-module.exports = { splitPattern, uniqueFollowQueueName, objectifyConnectionUrl }
+module.exports = { splitPattern, uniqueQueueName, objectifyConnectionUrl }
 
 function text2obj(input) {
   return input.split(',').reduce((prev, cur) => {
@@ -49,10 +49,15 @@ function splitPattern(input, wild = '*') {
     })
 }
 
-function uniqueFollowQueueName(routingKey, ...clientParts) {
-  const queueId = crypto
-    .createHash('md5')
-    .update(routingKey)
-    .digest('hex')
-  return [...clientParts, queueId].join('.')
+function uniqueQueueName(routingKey, ...clientParts) {
+  const queueParts = [...clientParts]
+  if (routingKey) {
+    queueParts.push(
+      crypto
+        .createHash('md5')
+        .update(routingKey)
+        .digest('hex')
+    )
+  }
+  return queueParts.join('.')
 }
