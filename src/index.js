@@ -6,6 +6,8 @@ const { splitPattern, uniqueQueueName, objectifyConnectionUrl } = require('./uti
 
 const schemas = require('./options')
 
+const RPC_QUEUE_PREFIX = 'rpc'
+
 module.exports = async (bishop, _options = {}) => {
   const options = validateOrThrow(_options, schemas.init)
   options.amqp.connection = objectifyConnectionUrl(options.amqp.connection)
@@ -15,18 +17,19 @@ module.exports = async (bishop, _options = {}) => {
   const AMQPOptions = {
     ...options.amqp,
     // listen for incoming rpc requests
-    listen: uniqueQueueName(null, 'rpc', name, options.env),
+    queue: uniqueQueueName(null, RPC_QUEUE_PREFIX, name, options.env),
+    tracer,
     name,
     version,
     timeout
   }
 
   /**
-   * Listen incoming messages and search result in local bishop instance
+   * Listen incoming messages, search result in local bishop instance and return response
    */
   const rpcListener = (message, properties, actions, callback) => {
     bishop
-      .act(message)
+      .act({ ...message, $local: true })
       .then(response => callback(null, response))
       .catch(err => callback(err))
   }
@@ -117,7 +120,7 @@ module.exports = async (bishop, _options = {}) => {
       if (!receiver) {
         throw new Error('Unable to send pattern - $receiver is not set')
       }
-      const queueName = uniqueQueueName(null, 'rpc', receiver, options.env)
+      const queueName = uniqueQueueName(null, RPC_QUEUE_PREFIX, receiver, options.env)
       const config = {
         confirm: true, // wait for commit confirmation
         mandatory: true, // exception if message can be routed to queue
@@ -126,9 +129,13 @@ module.exports = async (bishop, _options = {}) => {
         }
       }
       const result = typeof message === 'undefined' ? null : message
-      const response = await amqp.publishAndWait(queueName, result, config)
-      console.log('???', response)
-      process.exit()
+      return amqp.sendAndWait(queueName, result, config).catch(err => {
+        // handle "no amqp route" error and convert it into bishop error
+        if (err.replyText === 'NO_ROUTE') {
+          err.message = `remote service does not exist on route ${err.routingKey}`
+        }
+        throw err
+      })
     }
   }
 
