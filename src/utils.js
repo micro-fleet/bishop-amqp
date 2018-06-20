@@ -1,7 +1,9 @@
 const crypto = require('crypto')
 const { URL } = require('url')
 
-module.exports = { splitPattern, uniqueQueueName, objectifyConnectionUrl }
+const { createTraceSpan, finishSpan } = require('@fulldive/common/src/tracer')
+
+module.exports = { splitPattern, uniqueQueueName, objectifyConnectionUrl, creteFollowRouter }
 
 function text2obj(input) {
   return input.split(',').reduce((prev, cur) => {
@@ -49,6 +51,13 @@ function splitPattern(input, wild = '*') {
     })
 }
 
+/**
+ * Generate string from passed parameters starting from the second argument and divided by dot
+ * If routingKey is passed - it will be converted to the hash and appended to string
+ * Examples:
+ * - follow.amqp.default
+ * - follow.amqp.default.38eec02377875dce28eaef0692d7f4fc
+ */
 function uniqueQueueName(routingKey, ...clientParts) {
   const queueParts = [...clientParts]
   if (routingKey) {
@@ -60,4 +69,34 @@ function uniqueQueueName(routingKey, ...clientParts) {
     )
   }
   return queueParts.join('.')
+}
+
+function creteFollowRouter({ tracer, listener }) {
+  // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
+  return function router(_message, properties /*, raw*/) {
+    const bishopHeadersString = properties.headers && properties.headers.bishopHeaders
+    let bishopHeaders, message
+    // backward compatibility with previous bishop version (June 2018)
+    if (!bishopHeadersString) {
+      const [realMessage, _bishopHeaders] = _message
+      message = realMessage
+      bishopHeaders = _bishopHeaders
+    } else {
+      bishopHeaders = JSON.parse(bishopHeadersString)
+      message = _message
+    }
+
+    const span = createTraceSpan(tracer, 'follow:handler', bishopHeaders.trace)
+    span.setTag('bishop.follow.pattern', bishopHeaders.pattern)
+    span.setTag('bishop.follow.source', bishopHeaders.source)
+    listener(message, bishopHeaders)
+      .catch(err => {
+        finishSpan(span, err)
+        throw err
+      })
+      .then(result => {
+        finishSpan(span)
+        return result
+      })
+  }
 }

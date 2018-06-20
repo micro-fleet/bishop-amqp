@@ -1,0 +1,13 @@
+version: "2.1"
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: "rabbitmqctl status"
+      interval: 2s
+      timeout: 2s
+      retries: 30

@@ -1,17 +1,21 @@
-const { createTraceSpan, finishSpan } = require('@fulldive/common/src/tracer')
 const { validateOrThrow } = require('@fulldive/common/src/joi')
 const AMQPTransport = require('@microfleet/transport-amqp')
 
-const { splitPattern, uniqueQueueName, objectifyConnectionUrl } = require('./utils')
+const {
+  splitPattern,
+  uniqueQueueName,
+  objectifyConnectionUrl,
+  creteFollowRouter
+} = require('./utils')
 
-const schemas = require('./options')
+const optionsSchema = require('./options')
 
 const RPC_QUEUE_PREFIX = 'rpc'
 const DEFAULT_TIMEOUT = 5000
 const TIMEOUT_OFFSET = 100
 
 module.exports = async (bishop, _options = {}) => {
-  const options = validateOrThrow(_options, schemas.init)
+  const options = validateOrThrow(_options, optionsSchema)
   options.amqp.connection = objectifyConnectionUrl(options.amqp.connection)
   const { tracer, log = console } = bishop
   const { name, version, timeout } = options
@@ -22,7 +26,15 @@ module.exports = async (bishop, _options = {}) => {
   const AMQPOptions = {
     ...options.amqp,
     // listen for incoming rpc requests
-    queue: uniqueQueueName(null, RPC_QUEUE_PREFIX, name, options.env),
+    queue: uniqueQueueName(null, RPC_QUEUE_PREFIX, name, options.env), // "rpc.{servicename}.default"
+    defaultQueueOpts: {
+      autoDelete: true // as we use default queue for RPC-request, we want to delete queue if service exists
+    },
+    privateQueueOpts: {
+      // as we use private queue for RPC-responses, we want do delete queue if service exits
+      // WARN: unless we use "replyTo" named queues logic
+      autoDelete: true
+    },
     tracer,
     name,
     version,
@@ -40,18 +52,14 @@ module.exports = async (bishop, _options = {}) => {
       .catch(err => callback(err))
   }
 
-  const amqp = await AMQPTransport.connect(
-    AMQPOptions,
-    rpcListener
-  )
+  const amqp = await AMQPTransport.connect(AMQPOptions, rpcListener)
 
   // declare exchange for bishop.follow
-  // durable=false, autoDelete=true for backward compatibility purposes
   const followExchange = await amqp._amqp.exchangeAsync({
-    autoDelete: true,
-    durable: false,
+    autoDelete: false, // will stay if none consumers are connected
+    durable: true, // will survive brocker restart
     type: 'topic',
-    exchange: options.followExchange
+    exchange: options.followExchange // default exchange name is "bishop.follow"
   })
   await followExchange.declareAsync()
 
@@ -61,13 +69,14 @@ module.exports = async (bishop, _options = {}) => {
      */
     notify(message, bishopHeaders) {
       const routingKey = splitPattern(bishopHeaders.pattern).join('.')
+      // we do not use timeout in notification messages - they should exists untoll "follow"-specific queues will be destroyed after ttl
       const config = {
         exchange: options.followExchange,
         headers: {
           bishopHeaders: JSON.stringify(bishopHeaders)
         }
       }
-      const result = typeof message === 'undefined' ? null : message
+      const result = typeof message === 'undefined' ? null : message // unable to publish undefined using current transport library
       return amqp.publish(routingKey, result, config)
     },
 
@@ -75,46 +84,19 @@ module.exports = async (bishop, _options = {}) => {
      * Listen incoming patterns and match them against bishop.
      * Every message should be delivered to one app instance only by default
      */
-    async follow(message, listener, _config) {
-      const config = validateOrThrow(_config, schemas.follow)
-
+    async follow(message, listener, config) {
       const routingKey = `#.${splitPattern(message).join('.#.')}.#`
-      // WARN: queue name should be the same between instances to avoid messagind dublication
-      const queueName =
-        config.queue || uniqueQueueName(routingKey, 'follow', options.name, options.env)
-
-      // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
-      function router(_message, properties /*, raw*/) {
-        const bishopHeadersString = properties.headers && properties.headers.bishopHeaders
-        let bishopHeaders, message
-        // backward compatibility with previous bishop version
-        if (!bishopHeadersString) {
-          const [realMessage, _bishopHeaders] = _message
-          message = realMessage
-          bishopHeaders = _bishopHeaders
-        } else {
-          bishopHeaders = JSON.parse(bishopHeadersString)
-          message = _message
-        }
-
-        const span = createTraceSpan(tracer, 'follow:handler', bishopHeaders.trace)
-        span.setTag('bishop.follow.pattern', bishopHeaders.pattern)
-        span.setTag('bishop.follow.source', bishopHeaders.source)
-        listener(message, bishopHeaders)
-          .catch(err => {
-            finishSpan(span, err)
-            throw err
-          })
-          .then(result => {
-            finishSpan(span)
-            return result
-          })
-      }
-
-      const { queue } = await amqp.createQueue({ queue: queueName, router })
+      const queueOptions = { ...options.followQueueOpts, ...config }
+      // WARN: queue name should be the same between instances to avoid messaging duplication
+      queueOptions.queue =
+        queueOptions.queue || uniqueQueueName(routingKey, 'follow', options.name, options.env) // "follow.{servicename}.default.{routingKeyHash}"
+      queueOptions.router = creteFollowRouter({ listener, tracer })
+      const { queue } = await amqp.createQueue(queueOptions)
       await amqp.bindRoute(options.followExchange, queue, routingKey)
       log.debug(
-        `listen queue="${queueName}", route="${routingKey}", exchange="${options.followExchange}"`
+        `listen queue="${queueOptions.queue}", route="${routingKey}", exchange="${
+          options.followExchange
+        }"`
       )
     },
 
