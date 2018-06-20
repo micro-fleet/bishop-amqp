@@ -52,7 +52,10 @@ module.exports = async (bishop, _options = {}) => {
       .catch(err => callback(err))
   }
 
-  const amqp = await AMQPTransport.connect(AMQPOptions, rpcListener)
+  const amqp = await AMQPTransport.connect(
+    AMQPOptions,
+    rpcListener
+  )
 
   // declare exchange for bishop.follow
   const followExchange = await amqp._amqp.exchangeAsync({
@@ -77,6 +80,8 @@ module.exports = async (bishop, _options = {}) => {
         }
       }
       const result = typeof message === 'undefined' ? null : message // unable to publish undefined using current transport library
+      log.debug(`send follow event route="${routingKey}", exchange="${options.followExchange}"`)
+
       return amqp.publish(routingKey, result, config)
     },
 
