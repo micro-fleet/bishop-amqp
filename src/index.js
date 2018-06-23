@@ -1,5 +1,6 @@
 const { validateOrThrow } = require('@fulldive/common/src/joi')
 const AMQPTransport = require('@microfleet/transport-amqp')
+const createBloom = require('bloomrun')
 
 const {
   splitPattern,
@@ -43,14 +44,6 @@ module.exports = async (bishop, _options = {}) => {
   }
 
   const followQueues = {}
-  // declare exchange for bishop.follow
-  const followExchange = await amqp._amqp.exchangeAsync({
-    autoDelete: false, // will stay if none consumers are connected
-    durable: true, // will survive brocker restart
-    type: 'topic',
-    exchange: options.followExchange // default exchange name is "bishop.follow"
-  })
-  await followExchange.declareAsync()
 
   /**
    * Listen incoming messages, search result in local bishop instance and return response
@@ -74,18 +67,26 @@ module.exports = async (bishop, _options = {}) => {
     if (followQueues[queueOptions.queue]) {
       return followQueues[queueOptions.queue]
     }
-    // 2DO: listener should search for payload in new bishop instance and execute it
-
-    queueOptions.router = creteFollowRouter({ listener, tracer })
+    const payloadMatcher = createBloom()
+    queueOptions.router = creteFollowRouter({ payloadMatcher, tracer })
     const { queue } = await amqp.createQueue(queueOptions)
-    followQueues[queueOptions.queue] = queue
-    return queue
+    followQueues[queueOptions.queue] = { queue, payloadMatcher }
+    return followQueues[queueOptions.queue]
   }
 
   const amqp = await AMQPTransport.connect(
     AMQPOptions,
     rpcListener
   )
+
+  // declare exchange for bishop.follow
+  const followExchange = await amqp._amqp.exchangeAsync({
+    autoDelete: false, // will stay if none consumers are connected
+    durable: true, // will survive brocker restart
+    type: 'topic',
+    exchange: options.followExchange // default exchange name is "bishop.follow"
+  })
+  await followExchange.declareAsync()
 
   const methods = {
     /**
@@ -112,9 +113,8 @@ module.exports = async (bishop, _options = {}) => {
      */
     async follow(message, listener, config) {
       const routingKey = `#.${splitPattern(message).join('.#.')}.#`
-      const queue = await ensureFollowQueueAsync(config)
-
-      // 2do: should add listener to separate bishop instance
+      const { queue, payloadMatcher } = await ensureFollowQueueAsync(config)
+      payloadMatcher.add(message, listener)
       await amqp.bindRoute(options.followExchange, queue, routingKey)
       log.debug(`listen route="${routingKey}", exchange="${options.followExchange}"`)
     },

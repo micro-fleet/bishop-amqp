@@ -71,7 +71,7 @@ function uniqueQueueName(routingKey, ...clientParts) {
   return queueParts.join('.')
 }
 
-function creteFollowRouter({ tracer, listener }) {
+function creteFollowRouter({ tracer, payloadMatcher }) {
   // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
   return function router(_message, properties /*, raw*/) {
     const bishopHeadersString = properties.headers && properties.headers.bishopHeaders
@@ -89,7 +89,16 @@ function creteFollowRouter({ tracer, listener }) {
     const span = createTraceSpan(tracer, 'follow:handler', bishopHeaders.trace)
     span.setTag('bishop.follow.pattern', bishopHeaders.pattern)
     span.setTag('bishop.follow.source', bishopHeaders.source)
-    listener(message, bishopHeaders)
+
+    const payload = payloadMatcher.lookup(bishopHeaders.pattern)
+    if (!payload) {
+      throw new Error(
+        `Unable to find payload using pattern ${JSON.stringify(
+          bishopHeaders.pattern
+        )} - architecture bug`
+      )
+    }
+    payload(message, bishopHeaders)
       .catch(err => {
         finishSpan(span, err)
         throw err

@@ -28,14 +28,14 @@
     "eslint-config-prettier": "^2.6.0",
     "eslint-plugin-prettier": "^2.3.1",
     "nyc": "^12.0.2",
-    "prettier": "^1.13.4"
+    "prettier": "^1.13.4",
+    "@fulldive/bishop": "^1.0.0"
   },
   "dependencies": {
-    "@fulldive/bishop": "^1.0.0",
     "@fulldive/common": "^3.0.13",
     "@microfleet/transport-amqp": "^13.1.0",
-    "joi": "^13.1.2",
-    "shortid": "^2.2.8"
+    "bloomrun": "^4.1.0",
+    "joi": "^13.1.2"
   },
   "ava": {
     "verbose": true,
