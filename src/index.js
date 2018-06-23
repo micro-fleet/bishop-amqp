@@ -11,6 +11,7 @@ const {
 const optionsSchema = require('./options')
 
 const RPC_QUEUE_PREFIX = 'rpc'
+const FOLLOW_QUEUE_PREFIX = 'follow'
 const DEFAULT_TIMEOUT = 5000
 const TIMEOUT_OFFSET = 100
 
@@ -41,6 +42,16 @@ module.exports = async (bishop, _options = {}) => {
     timeout: defaultTimeout
   }
 
+  const followQueues = {}
+  // declare exchange for bishop.follow
+  const followExchange = await amqp._amqp.exchangeAsync({
+    autoDelete: false, // will stay if none consumers are connected
+    durable: true, // will survive brocker restart
+    type: 'topic',
+    exchange: options.followExchange // default exchange name is "bishop.follow"
+  })
+  await followExchange.declareAsync()
+
   /**
    * Listen incoming messages, search result in local bishop instance and return response
    */
@@ -52,19 +63,29 @@ module.exports = async (bishop, _options = {}) => {
       .catch(err => callback(err))
   }
 
+  /**
+   * Create .follow queue in not exists, emit incoming messages
+   */
+  const ensureFollowQueueAsync = async config => {
+    const queueOptions = { ...options.followQueueOpts, ...config }
+    queueOptions.queue =
+      queueOptions.queue || uniqueQueueName(null, FOLLOW_QUEUE_PREFIX, options.name, options.env) // "follow.{servicename}.default"
+
+    if (followQueues[queueOptions.queue]) {
+      return followQueues[queueOptions.queue]
+    }
+    // 2DO: listener should search for payload in new bishop instance and execute it
+
+    queueOptions.router = creteFollowRouter({ listener, tracer })
+    const { queue } = await amqp.createQueue(queueOptions)
+    followQueues[queueOptions.queue] = queue
+    return queue
+  }
+
   const amqp = await AMQPTransport.connect(
     AMQPOptions,
     rpcListener
   )
-
-  // declare exchange for bishop.follow
-  const followExchange = await amqp._amqp.exchangeAsync({
-    autoDelete: false, // will stay if none consumers are connected
-    durable: true, // will survive brocker restart
-    type: 'topic',
-    exchange: options.followExchange // default exchange name is "bishop.follow"
-  })
-  await followExchange.declareAsync()
 
   const methods = {
     /**
@@ -91,18 +112,11 @@ module.exports = async (bishop, _options = {}) => {
      */
     async follow(message, listener, config) {
       const routingKey = `#.${splitPattern(message).join('.#.')}.#`
-      const queueOptions = { ...options.followQueueOpts, ...config }
-      // WARN: queue name should be the same between instances to avoid messaging duplication
-      queueOptions.queue =
-        queueOptions.queue || uniqueQueueName(routingKey, 'follow', options.name, options.env) // "follow.{servicename}.default.{routingKeyHash}"
-      queueOptions.router = creteFollowRouter({ listener, tracer })
-      const { queue } = await amqp.createQueue(queueOptions)
+      const queue = await ensureFollowQueueAsync(config)
+
+      // 2do: should add listener to separate bishop instance
       await amqp.bindRoute(options.followExchange, queue, routingKey)
-      log.debug(
-        `listen queue="${queueOptions.queue}", route="${routingKey}", exchange="${
-          options.followExchange
-        }"`
-      )
+      log.debug(`listen route="${routingKey}", exchange="${options.followExchange}"`)
     },
 
     /**
