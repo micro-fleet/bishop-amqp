@@ -71,7 +71,9 @@ module.exports = async (bishop, _options = {}) => {
      * Emit notification message into AMQP follow queue
      */
     notify(message, bishopHeaders) {
-      const routingKey = splitPattern(bishopHeaders.pattern).join('.')
+      // notify full source pattern of the message so consumers could subsribe on part of it
+      const routingKey = splitPattern(bishopHeaders.source).join('.')
+      // const routingKey = splitPattern(bishopHeaders.pattern).join('.')
       // we do not use timeout in notification messages - they should exists untoll "follow"-specific queues will be destroyed after ttl
       const config = {
         exchange: options.followExchange,
