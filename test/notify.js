@@ -162,8 +162,9 @@ test.only('ensure message is not lost on consumer error', async t => {
   })
   producer.add('role:test-serialize, $notify:amqp', async () => {})
 
-  await failConsumer.follow('role:test-serialize', (message, headers) => {
+  await failConsumer.follow('role:test-serialize', async (message, headers) => {
     t.is(headers.source.text, text)
+    console.log('reject error')
     throw new Error('rejected error')
   })
 

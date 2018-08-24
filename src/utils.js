@@ -71,7 +71,7 @@ function uniqueQueueName(routingKey, ...clientParts) {
   return queueParts.join('.')
 }
 
-function creteFollowRouter({ tracer, listener, options }) {
+function creteFollowRouter({ tracer, listener }) {
   // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
   // https://medium.com/ibm-watson-data-lab/handling-failure-successfully-in-rabbitmq-22ffa982b60f
   return function router(_message, properties, raw) {
@@ -91,27 +91,43 @@ function creteFollowRouter({ tracer, listener, options }) {
     const span = createTraceSpan(tracer, 'follow:handler', bishopHeaders.trace)
     span.setTag('bishop.follow.pattern', bishopHeaders.pattern)
     span.setTag('bishop.follow.source', bishopHeaders.source)
-    listener(message, bishopHeaders)
-      .catch(err => {
-        // 2do: test against error
-        const requeueMessage = !properties.redelivered
-        if (requeueMessage) {
-          // resend message one more time
-          raw.retry()
-          span.setTag('bishop.follow.action', 'requeued')
-        } else {
-          // the message was requeued once - reject it (send to dead letter exchange)
-          raw.reject()
-          span.setTag('bishop.follow.action', 'rejected')
-        }
-        finishSpan(span, err)
-        throw err
-      })
-      .then(result => {
-        raw.ack() // mark message as processed
-        span.setTag('bishop.follow.action', 'processed')
-        finishSpan(span)
-        return result
-      })
+    console.log('1', 'got follow message')
+    ;(async () => {
+      try {
+        console.log('2', 'execute listener')
+        console.log(listener.toString())
+        const result = await listener(message, bishopHeaders)
+        console.log('3', 'listener exited sucessfully:', result)
+      } catch (err) {
+        console.log('3 caught error:', err)
+        process.exit()
+      }
+    })()
+    // listener(message, bishopHeaders)
+    //   .catch(err => {
+    //     // 2do: test against error
+    //     const requeueMessage = !properties.redelivered
+    //     console.log(1, 'parse')
+    //     if (requeueMessage) {
+    //       // resend message one more time
+    //       console.log(2, 'retry')
+    //       raw.retry()
+    //       span.setTag('bishop.follow.action', 'requeued')
+    //     } else {
+    //       console.log(3, 'reject')
+    //       // the message was requeued once - reject it (send to dead letter exchange)
+    //       raw.reject()
+    //       span.setTag('bishop.follow.action', 'rejected')
+    //     }
+    //     finishSpan(span, err)
+    //     throw err
+    //   })
+    //   .then(result => {
+    //     console.log(4, 'ack', result)
+    //     raw.ack() // mark message as processed
+    //     span.setTag('bishop.follow.action', 'processed')
+    //     finishSpan(span)
+    //     return result
+    //   })
   }
 }
