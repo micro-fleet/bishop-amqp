@@ -71,18 +71,20 @@ function uniqueQueueName(routingKey, ...clientParts) {
   return queueParts.join('.')
 }
 
-function creteFollowRouter({ tracer, listener }) {
+function creteFollowRouter({ tracer, listener, options }) {
   // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
-  return function router(_message, properties /*, raw*/) {
-    const bishopHeadersString = properties.headers && properties.headers.bishopHeaders
-    let bishopHeaders, message
+  // https://medium.com/ibm-watson-data-lab/handling-failure-successfully-in-rabbitmq-22ffa982b60f
+  return function router(_message, properties, raw) {
+    const headers = properties.headers || {}
+    let { bishopHeaders } = headers || {}
+    let message
     // backward compatibility with previous bishop version (June 2018)
-    if (!bishopHeadersString) {
+    if (!bishopHeaders) {
       const [realMessage, _bishopHeaders] = _message
       message = realMessage
       bishopHeaders = _bishopHeaders
     } else {
-      bishopHeaders = JSON.parse(bishopHeadersString)
+      bishopHeaders = JSON.parse(bishopHeaders)
       message = _message
     }
 
@@ -91,10 +93,23 @@ function creteFollowRouter({ tracer, listener }) {
     span.setTag('bishop.follow.source', bishopHeaders.source)
     listener(message, bishopHeaders)
       .catch(err => {
+        // 2do: test against error
+        const requeueMessage = !properties.redelivered
+        if (requeueMessage) {
+          // resend message one more time
+          raw.retry()
+          span.setTag('bishop.follow.action', 'requeued')
+        } else {
+          // the message was requeued once - reject it (send to dead letter exchange)
+          raw.reject()
+          span.setTag('bishop.follow.action', 'rejected')
+        }
         finishSpan(span, err)
         throw err
       })
       .then(result => {
+        raw.ack() // mark message as processed
+        span.setTag('bishop.follow.action', 'processed')
         finishSpan(span)
         return result
       })

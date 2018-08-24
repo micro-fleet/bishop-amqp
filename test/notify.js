@@ -94,7 +94,7 @@ test.serial('check valid serialization of undefined', async t => {
   })
   producer.add('role:test-serialize, $notify:amqp', async () => {})
 
-  await consumer.follow('role:test-serialize', (message, headers) => {
+  await consumer.follow('role:test-serialize', message => {
     t.is(message, null)
   })
 
@@ -129,7 +129,6 @@ test.serial('ensure messages are routed between instances correctly', async t =>
     messages.push(1)
   })
   await consumer2.follow('role: test, cmd: fake, $queue: test3-1', () => {
-    console.log(2)
     messages.push(2)
   })
 
@@ -146,4 +145,40 @@ test.serial('ensure messages are routed between instances correctly', async t =>
   await emitter.act('role: test, cmd: fake, additional: arguments')
   await Promise.delay(500)
   t.is(messages.length, 1)
+})
+
+test.only('ensure message is not lost on consumer error', async t => {
+  // t.plan(2)
+
+  const text = 'test stability'
+
+  const producer = new Bishop()
+  await producer.use(transport, {
+    name: 'amqp'
+  })
+  const failConsumer = new Bishop()
+  await failConsumer.use(transport, {
+    name: 'amqp'
+  })
+  producer.add('role:test-serialize, $notify:amqp', async () => {})
+
+  await failConsumer.follow('role:test-serialize', (message, headers) => {
+    t.is(headers.source.text, text)
+    throw new Error('rejected error')
+  })
+
+  await producer.act('role:test-serialize', { text })
+
+  // await Promise.delay(200)
+
+  // const reeiveConsumer = new Bishop()
+  // await reeiveConsumer.use(transport, {
+  //   name: 'amqp'
+  // })
+  // await reeiveConsumer.follow('role:test-serialize', (message, headers) => {
+  //   // t.is(headers.source.text, text)
+  //   t.pass()
+  //   console.log(headers)
+  // })
+  await Promise.delay(200)
 })

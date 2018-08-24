@@ -78,11 +78,12 @@ module.exports = async (bishop, _options = {}) => {
       const config = {
         exchange: options.followExchange,
         headers: {
-          bishopHeaders: JSON.stringify(bishopHeaders)
+          bishopHeaders: JSON.stringify(bishopHeaders),
+          'x-retry-count': options.followRetryCount
         }
       }
       const result = typeof message === 'undefined' ? null : message // unable to publish undefined using current transport library
-      log.debug(`send follow event route="${routingKey}", exchange="${options.followExchange}"`)
+      // log.debug(`send follow event route="${routingKey}", exchange="${options.followExchange}"`)
 
       return amqp.publish(routingKey, result, config)
     },
@@ -97,7 +98,7 @@ module.exports = async (bishop, _options = {}) => {
       // WARN: queue name should be the same between instances to avoid messaging duplication
       queueOptions.queue =
         queueOptions.queue || uniqueQueueName(routingKey, 'follow', options.name, options.env) // "follow.{servicename}.default.{routingKeyHash}"
-      queueOptions.router = creteFollowRouter({ listener, tracer })
+      queueOptions.router = creteFollowRouter({ listener, tracer, options })
       const { queue } = await amqp.createQueue(queueOptions)
       await amqp.bindRoute(options.followExchange, queue, routingKey)
       log.debug(

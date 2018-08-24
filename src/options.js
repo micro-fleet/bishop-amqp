@@ -1,5 +1,4 @@
 const Joi = require('joi')
-
 const schema = Joi.object({
   name: Joi.string()
     .min(1)
@@ -14,7 +13,14 @@ const schema = Joi.object({
     queue: Joi.string(),
     autoDelete: Joi.boolean().default(false, 'do not delete queue if no consumers left'),
     durable: Joi.boolean().default(true, 'survive restarts & use disk storage'),
+    neck: Joi.number()
+      .greater(0)
+      .default(1, 'amount of messages consumer will receive before acking'),
     arguments: Joi.object({
+      'x-dead-letter-exchange': Joi.string().default(
+        'amq.headers',
+        'default exchange for unhandled events'
+      ),
       'x-expires': Joi.number()
         .min(0)
         .default(1000 * 60 * 60 * 24, 'delete the follow queue after its been unused for 1 day')
