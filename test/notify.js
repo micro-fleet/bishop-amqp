@@ -1,12 +1,3 @@
-/*
-docker run --hostname my-rabbit \
- -e RABBITMQ_DEFAULT_USER=guest \
- -e RABBITMQ_DEFAULT_PASS=guest \
- -p 15672:15672 -p 5672:5672 \
- rabbitmq:3-management
-
-*/
-
 const { test } = require('ava')
 const Bishop = require('@fulldive/bishop')
 const transport = require(process.env.PWD)
@@ -145,41 +136,4 @@ test.serial('ensure messages are routed between instances correctly', async t =>
   await emitter.act('role: test, cmd: fake, additional: arguments')
   await Promise.delay(500)
   t.is(messages.length, 1)
-})
-
-test.only('ensure message is not lost on consumer error', async t => {
-  // t.plan(2)
-
-  const text = 'test stability'
-
-  const producer = new Bishop()
-  await producer.use(transport, {
-    name: 'amqp'
-  })
-  const failConsumer = new Bishop()
-  await failConsumer.use(transport, {
-    name: 'amqp'
-  })
-  producer.add('role:test-serialize, $notify:amqp', async () => {})
-
-  await failConsumer.follow('role:test-serialize', async (message, headers) => {
-    t.is(headers.source.text, text)
-    console.log('reject error')
-    throw new Error('rejected error')
-  })
-
-  await producer.act('role:test-serialize', { text })
-
-  // await Promise.delay(200)
-
-  // const reeiveConsumer = new Bishop()
-  // await reeiveConsumer.use(transport, {
-  //   name: 'amqp'
-  // })
-  // await reeiveConsumer.follow('role:test-serialize', (message, headers) => {
-  //   // t.is(headers.source.text, text)
-  //   t.pass()
-  //   console.log(headers)
-  // })
-  await Promise.delay(200)
 })

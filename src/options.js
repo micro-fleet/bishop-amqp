@@ -9,13 +9,14 @@ const schema = Joi.object({
   version: Joi.string().default('n/a'),
   timeout: Joi.number(),
   followExchange: Joi.string().default('bishop.events'),
+  /** settings for FOLLOW queue */
   followQueueOpts: Joi.object({
     queue: Joi.string(),
     autoDelete: Joi.boolean().default(false, 'do not delete queue if no consumers left'),
     durable: Joi.boolean().default(true, 'survive restarts & use disk storage'),
     neck: Joi.number()
       .greater(0)
-      .default(1, 'amount of messages consumer will receive before acking'),
+      .default(1, 'amount of messages follow-consumer will receive in parallel'),
     arguments: Joi.object({
       'x-dead-letter-exchange': Joi.string().default(
         'amq.headers',
@@ -28,10 +29,16 @@ const schema = Joi.object({
   })
     .description('default options for bishop.follow queues')
     .default(),
+  /**
+   * settings for RPC (default) queue + common connection settings
+   * https://github.com/microfleet/transport-amqp/blob/HEAD/src/schema.js
+   */
   amqp: Joi.object({
-    // https://github.com/microfleet/transport-amqp/blob/HEAD/src/schema.js
     connection: Joi.alternatives().try(Joi.string(), Joi.object()),
-    exchange: Joi.string().default('amq.topic')
+    exchange: Joi.string().default('amq.topic'),
+    neck: Joi.number()
+      .greater(0)
+      .default(100, 'amount of messages RPC-consumer will receive in parallel')
   })
     .default()
     .options({ allowUnknown: true, stripUnknown: false })
