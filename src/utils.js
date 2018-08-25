@@ -107,10 +107,12 @@ function creteFollowRouter({ tracer, listener, options }) {
           span.setTag('bishop.follow.action', 'rejected')
         } else {
           // message was not redelivered before and unhandled error is thrown
-          raw.requeue && raw.requeue()
+          raw.retry && raw.retry()
           span.setTag('bishop.follow.action', 'requeued')
         }
         finishSpan(span, err)
+        // NOTE: do not throw .follow error to avoid procces crush
+        // should handle `follow.*.error` instead
       }
     })()
   }

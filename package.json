@@ -24,6 +24,7 @@
   "homepage": "https://github.com/afoninsky/bishop-amqp#readme",
   "devDependencies": {
     "ava": "^0.25.0",
+    "benchmark": "^2.1.4",
     "bluebird": "^3.5.1",
     "eslint": "^5.4.0",
     "eslint-config-prettier": "^3.0.1",

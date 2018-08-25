@@ -15,18 +15,45 @@ test('requeue message', async t => {
   producer.add(`${pattern}, $notify:amqp-requeue-producer`, () => payload)
 
   await follower1.follow(pattern, message => {
-    console.log(1, message)
     t.is(message, payload)
     throw new Error('should requeue this message')
   })
 
   // should receive same message again
   await follower2.follow(pattern, message => {
-    console.log(2, message)
     t.is(message, payload)
   })
 
   const result = await act('amqp-requeue-producer', pattern)
   t.is(result, payload)
-  await BB.delay(1000)
+  await BB.delay(100)
+})
+
+test('reject message', async t => {
+  const messages = []
+  t.plan(3)
+  const pattern = 'role:test, act:qos-reject'
+  const payload = randomString()
+  const [producer] = await createAMQPClient('amqp-reject-producer')
+  const [, act] = await createAMQPClient('amqp-reject-consumer')
+  const [follower1] = await createAMQPClient('amqp-reject-follower')
+  const [follower2] = await createAMQPClient('amqp-reject-follower')
+
+  producer.add(`${pattern}, $notify:amqp-reject-producer`, () => payload)
+
+  await follower1.follow(pattern, message => {
+    t.is(message, payload)
+    messages.push(message)
+    throw new SyntaxError('should reject this message')
+  })
+
+  // should not receive same message again
+  await follower2.follow(pattern, message => {
+    messages.push(message)
+  })
+
+  const result = await act('amqp-reject-producer', pattern)
+  t.is(result, payload)
+  t.is(messages.length, 1)
+  await BB.delay(100)
 })
