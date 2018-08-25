@@ -8,8 +8,12 @@ const schema = Joi.object({
     .description('Env value to split different environments in one AMQP instance'),
   version: Joi.string().default('n/a'),
   timeout: Joi.number(),
-  followExchange: Joi.string().default('bishop.events'),
+  userErrors: Joi.array()
+    .unique()
+    .items(Joi.string())
+    .default(['Error'], 'do not requeue message if this error.name is thrown'),
   /** settings for FOLLOW queue */
+  followExchange: Joi.string().default('bishop.events'),
   followQueueOpts: Joi.object({
     queue: Joi.string(),
     autoDelete: Joi.boolean().default(false, 'do not delete queue if no consumers left'),

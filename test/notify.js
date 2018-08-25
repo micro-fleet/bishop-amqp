@@ -1,7 +1,9 @@
 const { test } = require('ava')
 const Bishop = require('@fulldive/bishop')
 const transport = require(process.env.PWD)
-const Promise = require('bluebird')
+const BB = require('bluebird')
+
+const { createAMQPClient, randomString } = require('./fixtures')
 
 test.serial('listen messages received over $notify', async t => {
   const bishop = new Bishop()

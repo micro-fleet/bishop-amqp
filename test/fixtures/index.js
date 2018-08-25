@@ -6,6 +6,7 @@ module.exports = { createAMQPClient, randomString }
 
 async function createAMQPClient(name, transportOptions = {}) {
   const bishop = new Bishop()
+  console.log({ ...transportOptions, name })
   await bishop.use(transport, { ...transportOptions, name })
   const act = async function($receiver, ...patterns) {
     const [basePattern] = patterns

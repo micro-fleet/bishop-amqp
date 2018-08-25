@@ -57,7 +57,8 @@ module.exports = async (bishop, _options = {}) => {
       } catch (err) {
         callback(err)
       } finally {
-        // mark message as handled
+        // mark message as handled in any case
+        // on error - response will be sent to consumer so no need to requeue this message
         actions.ack && actions.ack()
       }
     })()
@@ -108,7 +109,7 @@ module.exports = async (bishop, _options = {}) => {
       // WARN: queue name should be the same between instances to avoid messaging duplication
       queueOptions.queue =
         queueOptions.queue || uniqueQueueName(routingKey, 'follow', options.name, options.env) // "follow.{servicename}.default.{routingKeyHash}"
-      queueOptions.router = creteFollowRouter({ listener, tracer })
+      queueOptions.router = creteFollowRouter({ listener, tracer, options })
       const { queue } = await amqp.createQueue(queueOptions)
       await amqp.bindRoute(options.followExchange, queue, routingKey)
       log.debug(
