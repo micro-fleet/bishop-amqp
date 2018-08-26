@@ -20,7 +20,7 @@ const schema = Joi.object({
     durable: Joi.boolean().default(true, 'survive restarts & use disk storage'),
     neck: Joi.number()
       .greater(0)
-      .default(1, 'amount of messages follow-consumer will receive in parallel'),
+      .default(100, 'amount of messages follow-consumer will receive in parallel'),
     arguments: Joi.object({
       'x-dead-letter-exchange': Joi.string().default(
         'amq.headers',

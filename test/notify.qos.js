@@ -1,7 +1,7 @@
 const { test } = require('ava')
 const BB = require('bluebird')
 
-const { createAMQPClient, randomString } = require('./fixtures')
+const { createAMQPClient, randomString, DEFAULT_TIMEOUT } = require('./fixtures')
 
 test('requeue message', async t => {
   t.plan(3)
@@ -26,7 +26,7 @@ test('requeue message', async t => {
 
   const result = await act('amqp-requeue-producer', pattern)
   t.is(result, payload)
-  await BB.delay(100)
+  await BB.delay(DEFAULT_TIMEOUT)
 })
 
 test('reject message', async t => {
@@ -55,5 +55,5 @@ test('reject message', async t => {
   const result = await act('amqp-reject-producer', pattern)
   t.is(result, payload)
   t.is(messages.length, 1)
-  await BB.delay(100)
+  await BB.delay(DEFAULT_TIMEOUT)
 })

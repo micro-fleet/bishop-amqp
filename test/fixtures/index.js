@@ -2,7 +2,9 @@ const crypto = require('crypto')
 const Bishop = require('@fulldive/bishop')
 const transport = require('../../')
 
-module.exports = { createAMQPClient, randomString }
+const DEFAULT_TIMEOUT = 300
+
+module.exports = { createAMQPClient, randomString, DEFAULT_TIMEOUT }
 
 async function createAMQPClient(name, transportOptions = {}) {
   const bishop = new Bishop()
@@ -15,6 +17,6 @@ async function createAMQPClient(name, transportOptions = {}) {
   return [bishop, act]
 }
 
-function randomString() {
-  return crypto.randomBytes(20).toString('hex')
+function randomString(prefix = '') {
+  return `${prefix}:${crypto.randomBytes(20).toString('hex')}`
 }

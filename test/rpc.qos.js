@@ -1,32 +1,7 @@
 const { test } = require('ava')
 const BB = require('bluebird')
-const AMQPTransport = require('@microfleet/transport-amqp')
 
 const { createAMQPClient, randomString } = require('./fixtures')
-
-// https://github.com/microfleet/transport-amqp/issues/42
-// test.skip('paraller RPC messaging - bugfix test', async t => {
-//   let messageCount = 10
-//   const queueName = 'rpc-test123'
-//   const payload = 'some data'
-
-//   const amqp = await AMQPTransport.connect(
-//     {
-//       private: true,
-//       queue: queueName
-//     },
-//     (message, properties, actions, callback) => {
-//       callback(null, message)
-//     }
-//   )
-
-//   // t.plan(messageCount)
-//   await BB.map(new Array(messageCount), async () => {
-//     await amqp.sendAndWait(queueName, payload)
-//     t.is(result, payload)
-//   })
-//   t.pass()
-// })
 
 test('timeout on RPC queue limit', async t => {
   const payload = randomString()
