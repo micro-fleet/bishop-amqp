@@ -1,50 +1,34 @@
-/*
-docker run --hostname my-rabbit \
- -e RABBITMQ_DEFAULT_USER=guest \
- -e RABBITMQ_DEFAULT_PASS=guest \
- -p 15672:15672 -p 5672:5672 \
- rabbitmq:3-management
-
-*/
-
 const { test } = require('ava')
-const Bishop = require('@fulldive/bishop')
-const transport = require(process.env.PWD)
-const Promise = require('bluebird')
+const BB = require('bluebird')
 
-test.serial('listen messages received over $notify', async t => {
-  const bishop = new Bishop()
-  await bishop.use(transport, {
-    name: 'amqp-sample'
-  })
+const { createAMQPClient, randomString, DEFAULT_TIMEOUT } = require('./fixtures')
+
+test('listen messages received over $notify', async t => {
+  const payload = randomString('notify')
+  const [bishop] = await createAMQPClient('amqp-sample')
 
   t.plan(4)
-  const testMessage = Math.random()
 
-  bishop.add('role:test, act:eventemitter', () => {
+  bishop.add('role:test, cmd:basic, act:eventemitter', () => {
     t.pass()
-    return testMessage
+    return payload
   })
 
-  await bishop.follow('role:test, $queue: test1-1', message => {
+  await bishop.follow('role:test, cmd:basic, $queue: test1-1', message => {
     // receive same message twice (from 'local' and amqp)
-    t.is(message, testMessage)
+    t.is(message, payload)
   })
 
-  const result = await bishop.act('role:test, act:eventemitter', {
+  const result = await bishop.act('role:test, cmd:basic, act:eventemitter', {
     $notify: ['local', 'amqp-sample']
   })
-  t.is(result, testMessage)
-  await Promise.delay(500) // wait till message arrive over amqp
+  t.is(result, payload)
+  await BB.delay(DEFAULT_TIMEOUT) // wait till message arrive over amqp
 })
 
-test.serial('ensure events are routed to correct listeners', async t => {
+test('ensure events are routed to correct listeners', async t => {
   t.plan(5)
-
-  const bishop = new Bishop()
-  await bishop.use(transport, {
-    name: 'amqp-sample2'
-  })
+  const [bishop] = await createAMQPClient('amqp-sample2')
 
   bishop.add('role: statistic, event: stop-watch, cmd: create, $notify: amqp-sample2', () => {
     return 'valid-emitter-1'
@@ -78,72 +62,60 @@ test.serial('ensure events are routed to correct listeners', async t => {
   await bishop.act('role: users, cmd: create, other: option')
   await bishop.act('oops, role: users, cmd: create')
 
-  await Promise.delay(300)
+  await BB.delay(DEFAULT_TIMEOUT)
 })
 
-test.serial('check valid serialization of undefined', async t => {
+test('check valid serialization of undefined', async t => {
   t.plan(1)
 
-  const producer = new Bishop()
-  await producer.use(transport, {
-    name: 'amqp'
-  })
-  const consumer = new Bishop()
-  await consumer.use(transport, {
-    name: 'amqp'
-  })
-  producer.add('role:test-serialize, $notify:amqp', async () => {})
+  const [producer, act] = await createAMQPClient('amqp-undefined')
+  const [consumer] = await createAMQPClient('amqp-undefined')
 
-  await consumer.follow('role:test-serialize', (message, headers) => {
+  producer.add('role:test-serialize, $notify:amqp-undefined', async () => {})
+
+  await consumer.follow('role:test-serialize', message => {
     t.is(message, null)
   })
 
-  await producer.act('role:test-serialize')
-
-  await Promise.delay(300)
+  await act('amqp-undefined', 'role:test-serialize')
+  await BB.delay(DEFAULT_TIMEOUT)
 })
 
-test.serial('ensure messages are routed between instances correctly', async t => {
-  t.plan(3)
-  const emitter = new Bishop()
-  const consumer1 = new Bishop()
-  const consumer2 = new Bishop()
+test('ensure messages are routed between instances correctly', async t => {
+  t.plan(4)
 
-  await emitter.use(transport, { name: 'amqp' })
-  await consumer1.use(transport, {
-    name: 'amqp'
-  })
-  await consumer2.use(transport, {
-    name: 'amqp'
-  })
+  const payload = randomString('routing')
+  const [emitter] = await createAMQPClient('amqp-test-routing')
+  const [consumer1] = await createAMQPClient('amqp-test-routing')
+  const [consumer2] = await createAMQPClient('amqp-test-routing')
 
   emitter.add(
-    'role: test, cmd: fake, additional: arguments, $notify: amqp',
-    () => 'command executed'
+    'role:routing, cmd: fake, additional: arguments, $notify: amqp-test-routing',
+    () => payload
   )
 
   const messages = []
 
   // consumer1 OR consumer2 should receive message due to same queue
-  await consumer1.follow('role: test, cmd: fake, $queue: test3-1', () => {
-    messages.push(1)
+  await consumer1.follow('role:routing, cmd: fake, $queue: amqp-test3-1', message => {
+    messages.push(message)
   })
-  await consumer2.follow('role: test, cmd: fake, $queue: test3-1', () => {
-    console.log(2)
-    messages.push(2)
-  })
-
-  // consumer1 should receive message due to other queue name
-  await consumer1.follow('role: test, cmd: fake, $queue: test3-2', () => {
-    t.pass()
+  await consumer2.follow('role:routing, cmd: fake, $queue: amqp-test3-1', message => {
+    messages.push(message)
   })
 
   // consumer1 should receive message due to other queue name
-  await consumer1.follow('role: test, cmd, $queue: test3-3', () => {
-    t.pass()
+  await consumer1.follow('role:routing, cmd: fake, $queue: amqp-test3-2', message => {
+    t.is(message, payload)
   })
 
-  await emitter.act('role: test, cmd: fake, additional: arguments')
-  await Promise.delay(500)
+  // consumer1 should receive message due to other queue name
+  await consumer1.follow('role:routing, cmd, $queue: amqp-test3-3', message => {
+    t.is(message, payload)
+  })
+
+  await emitter.act('role:routing, cmd: fake, additional: arguments')
+  await BB.delay(DEFAULT_TIMEOUT)
   t.is(messages.length, 1)
+  t.is(messages[0], payload)
 })

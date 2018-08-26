@@ -71,32 +71,49 @@ function uniqueQueueName(routingKey, ...clientParts) {
   return queueParts.join('.')
 }
 
-function creteFollowRouter({ tracer, listener }) {
+function creteFollowRouter({ tracer, listener, options }) {
   // https://github.com/microfleet/transport-amqp/blob/69db5cef19d9e09f15a40b7dbc7891b5d9dbcb73/src/amqp.js#L101
-  return function router(_message, properties /*, raw*/) {
-    const bishopHeadersString = properties.headers && properties.headers.bishopHeaders
-    let bishopHeaders, message
+  // https://medium.com/ibm-watson-data-lab/handling-failure-successfully-in-rabbitmq-22ffa982b60f
+  return function router(_message, properties, raw) {
+    const headers = properties.headers || {}
+    let { bishopHeaders } = headers || {}
+    let message
     // backward compatibility with previous bishop version (June 2018)
-    if (!bishopHeadersString) {
+    if (!bishopHeaders) {
       const [realMessage, _bishopHeaders] = _message
       message = realMessage
       bishopHeaders = _bishopHeaders
     } else {
-      bishopHeaders = JSON.parse(bishopHeadersString)
+      bishopHeaders = JSON.parse(bishopHeaders)
       message = _message
     }
 
-    const span = createTraceSpan(tracer, 'follow:handler', bishopHeaders.trace)
+    const span = createTraceSpan(tracer, 'bishop.follow.handler', bishopHeaders.trace)
     span.setTag('bishop.follow.pattern', bishopHeaders.pattern)
     span.setTag('bishop.follow.source', bishopHeaders.source)
-    listener(message, bishopHeaders)
-      .catch(err => {
-        finishSpan(span, err)
-        throw err
-      })
-      .then(result => {
+    ;(async () => {
+      try {
+        const result = await listener(message, bishopHeaders)
+        raw.ack && raw.ack()
+        span.setTag('bishop.follow.action', 'processed')
         finishSpan(span)
         return result
-      })
+      } catch (err) {
+        // message not processed due to error - we either reject in into dead letter
+        if (headers.redelivered || !options.userErrors.includes(err.name)) {
+          // message was requeued before - reject the message
+          // unignored error thrown - reject the message
+          raw.reject && raw.reject()
+          span.setTag('bishop.follow.action', 'rejected')
+        } else {
+          // message was not redelivered before and unhandled error is thrown
+          raw.retry && raw.retry()
+          span.setTag('bishop.follow.action', 'requeued')
+        }
+        finishSpan(span, err)
+        // NOTE: do not throw .follow error to avoid procces crush
+        // should handle `follow.*.error` instead
+      }
+    })()
   }
 }

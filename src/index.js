@@ -25,31 +25,43 @@ module.exports = async (bishop, _options = {}) => {
 
   const AMQPOptions = {
     ...options.amqp,
-    // listen for incoming rpc requests
-    queue: uniqueQueueName(null, RPC_QUEUE_PREFIX, name, options.env), // "rpc.{servicename}.default"
-    defaultQueueOpts: {
-      autoDelete: true // as we use default queue for RPC-request, we want to delete queue if service exists
-    },
-    privateQueueOpts: {
-      // as we use private queue for RPC-responses, we want do delete queue if service exits
-      // WARN: unless we use "replyTo" named queues logic
-      autoDelete: true
-    },
+    // "rpc.{servicename}.default"
+    queue: uniqueQueueName(null, RPC_QUEUE_PREFIX, name, options.env),
     tracer,
     name,
     version,
-    timeout: defaultTimeout
+    timeout: defaultTimeout,
+    private: true,
+    defaultQueueOpts: {
+      autoDelete: true
+    },
+    privateQueueOpts: {
+      autoDelete: true
+    }
   }
 
   /**
    * Listen incoming messages, search result in local bishop instance and return response
    */
   const rpcListener = (message, properties, actions, callback) => {
-    const headersTimeout = properties.headers.timeout && properties.headers.timeout - TIMEOUT_OFFSET
-    bishop
-      .act({ ...message, $local: true, $timeout: headersTimeout || defaultTimeout })
-      .then(response => callback(null, response))
-      .catch(err => callback(err))
+    const $timeout =
+      (properties.headers.timeout && properties.headers.timeout - TIMEOUT_OFFSET) || defaultTimeout
+    ;(async () => {
+      try {
+        const result = await bishop.act({
+          ...message,
+          $local: true,
+          $timeout
+        })
+        callback(null, result)
+      } catch (err) {
+        callback(err)
+      } finally {
+        // mark message as handled in any case
+        // on error - response will be sent to consumer so no need to requeue this message
+        actions.ack && actions.ack()
+      }
+    })()
   }
 
   const amqp = await AMQPTransport.connect(
@@ -82,7 +94,7 @@ module.exports = async (bishop, _options = {}) => {
         }
       }
       const result = typeof message === 'undefined' ? null : message // unable to publish undefined using current transport library
-      log.debug(`send follow event route="${routingKey}", exchange="${options.followExchange}"`)
+      // log.debug(`send follow event route="${routingKey}", exchange="${options.followExchange}"`)
 
       return amqp.publish(routingKey, result, config)
     },
@@ -97,7 +109,7 @@ module.exports = async (bishop, _options = {}) => {
       // WARN: queue name should be the same between instances to avoid messaging duplication
       queueOptions.queue =
         queueOptions.queue || uniqueQueueName(routingKey, 'follow', options.name, options.env) // "follow.{servicename}.default.{routingKeyHash}"
-      queueOptions.router = creteFollowRouter({ listener, tracer })
+      queueOptions.router = creteFollowRouter({ listener, tracer, options })
       const { queue } = await amqp.createQueue(queueOptions)
       await amqp.bindRoute(options.followExchange, queue, routingKey)
       log.debug(
@@ -118,15 +130,13 @@ module.exports = async (bishop, _options = {}) => {
       const queueName = uniqueQueueName(null, RPC_QUEUE_PREFIX, receiver, options.env)
       const config = {
         confirm: true, // wait for commit confirmation
-        mandatory: true, // exception if message can be routed to queue
+        mandatory: true, // exception if message cant be routed to queue
         headers: {
           bishopHeaders: JSON.stringify(headers)
         }
       }
-      if (timeout) {
-        // proxy timeout if set in request
-        config.headers.timeout = timeout + TIMEOUT_OFFSET
-      }
+      // proxy timeout if set in request
+      config.headers.timeout = (timeout || defaultTimeout) + TIMEOUT_OFFSET
 
       const result = typeof message === 'undefined' ? null : message
       return amqp.sendAndWait(queueName, result, config).catch(err => {

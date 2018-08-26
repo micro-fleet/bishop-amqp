@@ -24,18 +24,20 @@
   "homepage": "https://github.com/afoninsky/bishop-amqp#readme",
   "devDependencies": {
     "ava": "^0.25.0",
-    "eslint": "^4.18.1",
-    "eslint-config-prettier": "^2.6.0",
-    "eslint-plugin-prettier": "^2.3.1",
+    "benchmark": "^2.1.4",
+    "bluebird": "^3.5.1",
+    "eslint": "^5.4.0",
+    "eslint-config-prettier": "^3.0.1",
+    "eslint-plugin-prettier": "^2.6.2",
     "nyc": "^12.0.2",
-    "prettier": "^1.13.4"
+    "prettier": "^1.14.2"
   },
   "dependencies": {
     "@fulldive/bishop": "^1.0.0",
-    "@fulldive/common": "^3.0.13",
-    "@microfleet/transport-amqp": "^13.1.0",
-    "joi": "^13.1.2",
-    "shortid": "^2.2.8"
+    "@fulldive/common": "^3.1.2",
+    "@microfleet/transport-amqp": "^13.1.2",
+    "joi": "^13.6.0",
+    "shortid": "^2.2.13"
   },
   "ava": {
     "verbose": true,

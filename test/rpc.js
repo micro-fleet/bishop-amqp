@@ -1,54 +1,39 @@
 const { test } = require('ava')
-const Bishop = require('@fulldive/bishop')
-const transport = require(process.env.PWD)
+const { createAMQPClient, randomString } = require('./fixtures')
 
 test('perform simple RPC calls', async t => {
-  const consumer = new Bishop()
-  const producer = new Bishop()
+  const payload = randomString()
 
-  const REMOTE_SUCCESS = 'remote request success'
+  const [, act] = await createAMQPClient('rpc-consumer')
+  const [producer] = await createAMQPClient('rpc-producer')
 
-  await consumer.use(transport, {
-    name: 'rpc-consumer'
-  })
-  await producer.use(transport, {
-    name: 'rpc-producer'
-  })
-  consumer.add('role:rpc, cmd:remote-request, $receiver:rpc-producer', 'rpc-consumer')
-  producer.add('role:rpc, cmd:remote-request', () => REMOTE_SUCCESS)
+  producer.add('role:rpc, cmd:remote-request', () => payload)
 
   // remote requests succesful
-  const result1 = await consumer.act('role:rpc, cmd:remote-request, respect:local')
-  t.is(result1, REMOTE_SUCCESS)
+  const result1 = await act('rpc-producer', 'role:rpc, cmd:remote-request, respect:local')
+  t.is(result1, payload)
 
   // request to non-existing pattern in existing remote service
-  const error1 = await t.throws(consumer.act('role:rpc, cmd:remote-request-nosuch'))
-  t.is(error1.message, 'pattern not found: role:rpc, cmd:remote-request-nosuch')
+  const errorNotFoundPattern = await t.throws(
+    act('rpc-producer', 'role:rpc, cmd:remote-request-nosuch')
+  )
+  t.is(errorNotFoundPattern.name, 'NotFoundError')
 
   // request to non-existing pattern in non-existing remote service
-  const error2 = await t.throws(
-    consumer.act('role:rpc, cmd:remote-request, $receiver:no-such-consumer')
+  const errorNotFoundService = await t.throws(
+    act('rpc-producer-nonexising', 'role:rpc, cmd:remote-request')
   )
-  t.is(error2.message, 'remote service does not exist on route rpc.no-such-consumer.default')
+  t.is(errorNotFoundService.name, 'AMQP_BasicReturnError')
+  t.is(errorNotFoundService.code, 'ERR_AMQP_BASIC_RETURN')
 })
 
 test('only one service gets RPC call', async t => {
-  const consumer = new Bishop()
-  const producer1 = new Bishop()
-  const producer2 = new Bishop()
-
   const callQueue = []
 
-  await consumer.use(transport, {
-    name: 'single-consumer'
-  })
-  await producer1.use(transport, {
-    name: 'single-producer'
-  })
-  await producer2.use(transport, {
-    name: 'single-producer'
-  })
-  consumer.add('role:rpc, cmd:remote-request, $receiver:single-producer', 'single-consumer')
+  const [, act] = await createAMQPClient('single-consumer')
+  const [producer1] = await createAMQPClient('single-producer')
+  const [producer2] = await createAMQPClient('single-producer')
+
   producer1.add('role:rpc, cmd:remote-request', () => {
     callQueue.push('producer1')
     return 'producer1'
@@ -59,7 +44,7 @@ test('only one service gets RPC call', async t => {
   })
 
   // remote requests succesful
-  const result = await consumer.act('role:rpc, cmd:remote-request, respect:local')
+  const result = await act('single-producer', 'role:rpc, cmd:remote-request, respect:local')
   t.is(callQueue.length, 1)
   t.is(callQueue[0], result)
 })
