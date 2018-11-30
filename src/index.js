@@ -67,6 +67,9 @@ module.exports = async (bishop, _options = {}) => {
   const amqp = await AMQPTransport.connect(
     AMQPOptions,
     rpcListener
+  ).timeout(
+    options.amqp.connectTimeout,
+    `AMQP service is still not available after ${options.amqp.connectTimeout}ms`
   )
 
   // declare exchange for bishop.follow
@@ -79,6 +82,7 @@ module.exports = async (bishop, _options = {}) => {
   await followExchange.declareAsync()
 
   const methods = {
+    amqp,
     /**
      * Emit notification message into AMQP follow queue
      */
