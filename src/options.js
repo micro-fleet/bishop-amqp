@@ -40,6 +40,7 @@ const schema = Joi.object({
   amqp: Joi.object({
     connection: Joi.alternatives().try(Joi.string(), Joi.object()),
     exchange: Joi.string().default('amq.topic'),
+    connectTimeout: Joi.number().default(5000, 'First connect timeout'),
     neck: Joi.number()
       .greater(0)
       .default(100, 'amount of messages RPC-consumer will receive in parallel')
